@@ -1,0 +1,38 @@
+[gd_scene load_steps=3 format=3 uid="uid://cgk1oo4tg63vd"]
+
+[ext_resource type="Script" uid="uid://itkqlucwklsn" path="res://BoardUiTest.cs" id="1_5xd3q"]
+[ext_resource type="PackedScene" uid="uid://dw8feds2m137l" path="res://Scenes/square.tscn" id="2_jusef"]
+
+[node name="boardUiTest" type="Control" node_paths=PackedStringArray("tileContainer", "pieceContainer")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -680.0
+offset_bottom = -120.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_5xd3q")
+squareScene = ExtResource("2_jusef")
+tileContainer = NodePath("TileContainer")
+pieceContainer = NodePath("PieceContainer")
+metadata/_edit_use_anchors_ = true
+
+[node name="TileContainer" type="GridContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/h_separation = 0
+theme_override_constants/v_separation = 0
+columns = 8
+
+[node name="PieceContainer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2

@@ -1,0 +1,34 @@
+[gd_scene load_steps=4 format=3 uid="uid://cjqog2i1eunxw"]
+
+[ext_resource type="Script" uid="uid://bh63lbg0v4ll" path="res://Scripts/TestSuite.cs" id="1_kp4v3"]
+[ext_resource type="PackedScene" uid="uid://b80m4l8hk5vvr" path="res://Scenes/test_button.tscn" id="2_qqaoi"]
+[ext_resource type="PackedScene" uid="uid://dggh6cyhgxfls" path="res://Scenes/test-label.tscn" id="3_nr8v7"]
+
+[node name="TestSuite" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_kp4v3")
+TestButtonScene = ExtResource("2_qqaoi")
+TestLabelScene = ExtResource("3_nr8v7")
+
+[node name="Container" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ResultContainer" type="VBoxContainer" parent="Container"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ButtonContainer" type="VBoxContainer" parent="Container"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.5
+alignment = 1

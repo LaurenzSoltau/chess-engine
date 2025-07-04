@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://bikmwjqfokywu"]
+
+[ext_resource type="Script" uid="uid://dmyngo20wujpf" path="res://Scripts/Piece.cs" id="1_jf0mb"]
+[ext_resource type="Texture2D" uid="uid://cob1nqygduhi7" path="res://Assets/black-rook.png" id="2_y70yu"]
+
+[node name="Piece" type="Node2D"]
+script = ExtResource("1_jf0mb")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_y70yu")
