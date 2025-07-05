@@ -26,5 +26,6 @@ namespace Chess
             IsCastling = isCastling;
             movingPieceColor = Piece.GetColor(movingPiece);
         }
+        public Move() { }
     }
 }

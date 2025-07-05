@@ -1,7 +1,8 @@
 using Godot;
 using System;
 
-public partial class Square : Node2D {
+public partial class Square : Node2D
+{
     ColorRect baseRect;
     ColorRect highlightRect;
     public bool isLight;
@@ -14,7 +15,6 @@ public partial class Square : Node2D {
 
     public void Setup(bool isLight, Vector2 size)
     {
-
         this.isLight = isLight;
         baseRect.Size = size;
         highlightRect.Size = size;

@@ -1,8 +1,10 @@
 using Chess;
+using Chess.Bot;
 using Godot;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 public partial class GameManager : Control
@@ -12,22 +14,24 @@ public partial class GameManager : Control
     [Export]
     SubViewport SubViewport;
     VBoxContainer sideBar;
+    [Signal]
+    public delegate void HumanTurnEventHandler();
     public BoardUI boardUi;
 
     public enum PlayerType { Human, Bot };
 
     public enum GameState { Playing, WhiteIsMated, BlackIsMated, Stalemate, Repition, FiftyMove, InsufficientMaterial }
 
-
-
     public GameState gameState;
     PlayerType whitePlayerType;
     PlayerType blackPlayerType;
     PlayerType playerToMove;
+    int gameId;
     int colorToMove;
     public Board board;
 
     Random random;
+    Searcher ai;
 
     public string PositionFen;
 
@@ -38,7 +42,7 @@ public partial class GameManager : Control
         boardUi = boardUIPackedScene.Instantiate() as BoardUI;
         sideBar = GetNode<VBoxContainer>("HBoxContainer/MarginContainer/SideBar");
         SubViewport.AddChild(boardUi);
-        boardUi.MoveAttempted += OnMoveAttempted;
+        boardUi.AttempMakeMove += OnMoveAttempted;
         foreach (Node child in GetNode<VBoxContainer>("HBoxContainer/MarginContainer/SideBar").GetChildren())
         {
             if (child is Button startGameButton)
@@ -50,28 +54,54 @@ public partial class GameManager : Control
         random = new Random();
 
         PositionFen = FenUtil.StartFen;
-        board = new();
-        board.LoadPosition(PositionFen);
-        boardUi.UpdatePosition(board);
+        gameId = 0;
+        SetPlayers(1);
+        NewGame();
     }
 
-    private void OnMoveAttempted(Vector2 from, Vector2 to)
+
+
+    public override void _Process(double delta)
+    {
+        HandleInput();
+    }
+
+    void HandleInput()
+    {
+    }
+
+    private void OnMoveAttempted(int fromIndex, int toIndex)
     {
         if (playerToMove != PlayerType.Human || gameState != GameState.Playing)
+        {
             return;
+        }
+
+        Move legalMove = new();
+        bool isLegal = false;
 
         var legalMoves = board.GenerateLegalMoves();
-        Move chosenMove;
-        foreach (var move in legalMoves) {
-            if (move.From == BoardRepresentation.IndexFromCoord((int)from.X, (int)from.Y) && move.To == BoardRepresentation.IndexFromCoord((int)to.X, (int)to.Y)) {
-                chosenMove = move;
-                board.MakeMove(chosenMove);
-                boardUi.UpdatePosition(board);
-                UpdateGameState();
+        foreach (Move move in legalMoves)
+        {
+            if (move.From == fromIndex && move.To == toIndex)
+            {
+                legalMove = move;
+                isLegal = true;
                 break;
             }
         }
-        SwitchTurn();
+        if (isLegal)
+        {
+            board.MakeMove(legalMove);
+            boardUi.UpdatePosition();
+            UpdateGameState();
+            SwitchTurn();
+            boardUi.OnMoveAccepted(legalMove);
+        }
+        else
+        {
+            boardUi.OnMoveDeclined();
+        }
     }
 
     void PerformTurn()
@@ -94,9 +124,20 @@ public partial class GameManager : Control
 
     void SwitchTurn()
     {
+        if (gameState != GameState.Playing)
+        {
+            return;
+        }
         colorToMove = colorToMove == Chess.Piece.White ? Chess.Piece.Black : Chess.Piece.White;
-        if (colorToMove == Chess.Piece.White && whitePlayerType == PlayerType.Bot) MakeAiMove();
-        if (colorToMove == Chess.Piece.Black && blackPlayerType == PlayerType.Bot) MakeAiMove();
+        playerToMove = GetPlayerType(colorToMove);
+        if (playerToMove == PlayerType.Human)
+        {
+            EmitSignal(SignalName.HumanTurn);
+        }
+        else
+        {
+            MakeAiMove();
+        }
 
     }
 
@@ -108,11 +149,13 @@ public partial class GameManager : Control
 
     void NewGame()
     {
+        gameId++;
         colorToMove = Chess.Piece.White;
         playerToMove = whitePlayerType;
         board = new();
         board.LoadPosition(PositionFen);
-        boardUi.UpdatePosition(board);
+        ai = new Searcher(board);
+        boardUi.SetBoard(board);
         boardUi.SetPerspective(blackPlayerType == PlayerType.Human ? Chess.Piece.Black : Chess.Piece.White);
 
         gameState = GameState.Playing;
@@ -140,14 +183,18 @@ public partial class GameManager : Control
 
     async void MakeAiMove()
     {
-        await Task.Delay(20);
-        List<Move> moves = board.GenerateLegalMoves();
+        int thisGameId = gameId;
+        await Task.Delay(200);
+        if (thisGameId != gameId)
+        {
+            return;
+        }
+        ai.StartSearch(4);
+        Move move = ai.bestMove;
 
-
-
-        Move move = moves[random.Next(moves.Count - 1)];
         board.MakeMove(move);
-        boardUi.UpdatePosition(board);
+        boardUi.UpdatePosition();
+        boardUi.OnAiTurn(move);
         UpdateGameState();
 
         SwitchTurn();
@@ -158,7 +205,7 @@ public partial class GameManager : Control
         var legalMoves = board.GenerateLegalMoves();
         if (legalMoves.Count == 0)
         {
-            if (board.IsKingInCheck(colorToMove))
+            if (board.IsKingInCheck(-colorToMove))
             {
                 gameState = (colorToMove == Chess.Piece.White) ? GameState.WhiteIsMated : GameState.BlackIsMated;
             }
@@ -196,7 +243,6 @@ public partial class GameManager : Control
         GameState.InsufficientMaterial => "Remis durch unzureichendes Material!",
         _ => "Unbekannter Spielzustand.",
     };
-
     GD.Print("Game Over: " + message);
 
     // Optional: UI anzeigen

@@ -1,8 +1,6 @@
 using Chess;
 using Godot;
 using System;
-using System.Collections.Generic;
-using System.Resources;
 
 public partial class BoardUI : Node2D
 {
@@ -11,10 +9,24 @@ public partial class BoardUI : Node2D
     Node2D tileContainer;
     Node2D pieceContainer;
 
-    [Signal]
-    public delegate void MoveAttemptedEventHandler(Vector2 fromSquare, Vector2 toSquare);
-    private Vector2? selectedSquare = null;
+    public enum InputState
+    {
+        None,
+        PieceSelected,
+        DraggingPiece,
+        Blocked
+    }
 
+    bool firstMoveMade = false;
+
+    InputState currentState;
+
+    (int rank, int file) selectedPieceSquare;
+
+    (int from, int to) lastMoveMade;
+
+    [Signal]
+    public delegate void AttempMakeMoveEventHandler(int fromIndex, int toIndex);
     bool fromWhitePerspective = true;
 
     public Vector2 BoardSize = new(600, 600);
@@ -23,70 +35,245 @@ public partial class BoardUI : Node2D
 
     Piece[] pieces = new Piece[64];
     Square[] squares = new Square[64];
-    Board board;
-
-    public override void _Input(InputEvent @event)
-    {
-        if (@event is InputEventMouseButton mouseEvent && mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
-        {
-            Vector2 clickedSquare = GetSquareFromMouse(GetLocalMousePosition());
-
-            if (selectedSquare == null)
-            {
-                // First click: select piece square
-                selectedSquare = clickedSquare;
-            }
-            else
-            {
-                // Second click: destination square
-                Vector2 from = selectedSquare.Value;
-                Vector2 to = clickedSquare;
-
-                // Emit the move signal
-                GD.Print(from, to);
-                EmitSignal(nameof(MoveAttempted), from, to);
-
-                // Clear selection & highlights
-                selectedSquare = null;
-            }
-        }
-    }
-
-    private Vector2 GetSquareFromMouse(Vector2 mousePos)
-    {
-        GD.Print(mousePos.X);
-        GD.Print(mousePos.Y);
-        // Example: convert mouse position to board coordinates (0-7, 0-7)
-        // Adjust based on your board UI layout and scaling!
-        int file = Math.Clamp(((int)mousePos.X) / ((int)tileSizeInPx), 0, 7);
-        int rank = Math.Clamp(7 - (int)(mousePos.Y / tileSizeInPx), 0, 7);
-        return new Vector2(rank, file);
-    }
+    Board logicBoard;
+    GameManager gameManager;
 
     public override void _Ready()
     {
-        board = new Board();
-        board.LoadPosition(FenUtil.StartFen);
+        gameManager = (GameManager)GetTree().CurrentScene;
+        gameManager.HumanTurn += OnHumanTurn;
         tileSizeInPx = (int)BoardSize.X / BoardDimension;
         tileContainer = GetNode<Node2D>("TileContainer");
         pieceContainer = GetNode<Node2D>("PieceContainer");
         CreateBoardUi();
-        UpdatePosition(board);
+        currentState = InputState.None;
+        Board board = new();
+        board.LoadPosition(FenUtil.StartFen);
+        SetBoard(board);
+    }
+    public override void _Process(double delta)
+    {
+        HandleInput();
     }
 
-    public void HighlightPossibleMoves(Board board, int fromSquare)
+    public void OnAiTurn(Move move)
     {
-        List<Move> moves = board.GenerateLegalMoves();
-        for (int i = 0; i < moves.Count; i++)
+        firstMoveMade = true;
+        lastMoveMade = (move.From, move.To);
+        ResetSquareColours();
+    }
+
+    void OnHumanTurn()
+    {
+        currentState = InputState.None;
+    }
+    public void SetBoard(Board board)
+    {
+        firstMoveMade = false;
+        logicBoard = board;
+        ResetSquareColours(false);
+        UpdatePosition();
+    }
+
+    void HandleInput()
+    {
+        if (currentState == InputState.Blocked)
         {
-            Move move = moves[i];
-            if (move.From == fromSquare)
+            return;
+        }
+        Vector2 mousePos = GetLocalMousePosition();
+
+        if (currentState == InputState.None)
+        {
+            HandlePieceSelection(mousePos);
+        }
+        else if (currentState == InputState.DraggingPiece)
+        {
+            HandleDragMovement(mousePos);
+        }
+        else if (currentState == InputState.PieceSelected)
+        {
+            HandleClickMovement(mousePos);
+        }
+    }
+
+    void HandleClickMovement(Vector2 mousePos)
+    {
+        if (Input.IsMouseButtonPressed(MouseButton.Left))
+        {
+            HandlePiecePlacement(mousePos);
+        }
+    }
+
+    void HandlePieceSelection(Vector2 mousePos)
+    {
+        if (Input.IsMouseButtonPressed(MouseButton.Left))
+        {
+            var pressedSquare = GetSquareFromMouse(mousePos);
+            int index = BoardRepresentation.IndexFromCoord(pressedSquare.rank, pressedSquare.file);
+            if (index < 0 || index > 63) return;
+
+            selectedPieceSquare = pressedSquare;
+            if (Chess.Piece.IsColor(logicBoard.Squares[index], logicBoard.ColourToMove))
             {
-                (int rank, int file) coord = BoardRepresentation.CoordFromIndex(i);
-                SetSquareHighlightColor(coord, BoardColors.lightSquares.highlightPossibleMove, BoardColors.darkSquares.highlightPossibleMove);
+                ResetSquareColours();
+                HighlightLegalMoves();
+                SelectSquare(selectedPieceSquare);
+                currentState = InputState.DraggingPiece;
             }
         }
     }
+
+    void HighlightLegalMoves()
+    {
+        var legalMoves = logicBoard.GenerateLegalMoves();
+        int selectedMoveIndex = BoardRepresentation.IndexFromCoord(selectedPieceSquare.rank, selectedPieceSquare.file);
+        foreach (Move move in legalMoves) {
+
+            if (selectedMoveIndex == move.From)
+            {
+                (int rank, int file) coords = BoardRepresentation.CoordFromIndex(move.To);
+                SetSquareHighlightColor(coords, BoardColors.lightSquares.highlightPossibleMove, BoardColors.darkSquares.highlightPossibleMove);
+            }
+        }
+    }
+
+    void HandleDragMovement(Vector2 mousePos)
+    {
+        DragPiece(selectedPieceSquare, mousePos);
+        if (!Input.IsMouseButtonPressed(MouseButton.Left))
+        {
+            HandlePiecePlacement(mousePos);
+        }
+    }
+
+
+    void HandlePiecePlacement(Vector2 mousePos)
+    {
+        (int rank, int file) targetSquare = GetSquareFromMouse(mousePos);
+        int index = BoardRepresentation.IndexFromCoord(targetSquare.rank, targetSquare.file);
+        if (index < 0 || index > 63) return;
+
+        if (targetSquare == selectedPieceSquare)
+        {
+            ResetPiecePosition(selectedPieceSquare);
+            if (currentState == InputState.DraggingPiece)
+            {
+                currentState = InputState.PieceSelected;
+            }
+            else
+            {
+                ResetSquareColours();
+                currentState = InputState.None;
+                DeselectSquare(selectedPieceSquare);
+            }
+        }
+        else
+        {
+            if (Chess.Piece.IsColor(logicBoard.Squares[index], logicBoard.ColourToMove) && logicBoard.Squares[index] != Chess.Piece.None)
+            {
+                CancelPieceSelection();
+            }
+            else
+            {
+                TryMakeMove(selectedPieceSquare, targetSquare);
+            }
+        }
+    }
+
+    void TryMakeMove((int rank, int file) selectedPieceSquare, (int rank, int file) targetSquare)
+    {
+        int fromIndex = BoardRepresentation.IndexFromCoord(selectedPieceSquare.rank, selectedPieceSquare.file);
+        int toIndex = BoardRepresentation.IndexFromCoord(targetSquare.rank, targetSquare.file);
+        EmitSignal(SignalName.AttempMakeMove, fromIndex, toIndex);
+    }
+
+    public void OnMoveAccepted(Move move)
+    {
+        currentState = InputState.Blocked;
+        lastMoveMade = (move.From, move.To);
+        UpdatePosition();
+        ResetSquareColours();
+        firstMoveMade = true;
+    }
+
+    public void OnMoveDeclined()
+    {
+        ResetSquareColours();
+        CancelPieceSelection();
+    }
+
+    void ResetSquareColours(bool highlight = true)
+    {
+        for (int rank = 0; rank < BoardDimension; rank++)
+        {
+            for (int file = 0; file < BoardDimension; file++)
+            {
+                SetSquareHighlightColor((rank, file), BoardColors.lightSquares.normal, BoardColors.darkSquares.normal);
+            }
+        }
+        var from = BoardRepresentation.CoordFromIndex(lastMoveMade.from);
+        var to = BoardRepresentation.CoordFromIndex(lastMoveMade.to);
+        if (highlight && firstMoveMade)
+        {
+            SetSquareHighlightColor(from, BoardColors.lightSquares.highlightLastMove, BoardColors.darkSquares.highlightLastMove);
+            SetSquareHighlightColor(to, BoardColors.lightSquares.highlightMove, BoardColors.darkSquares.highlightMove);
+        }
+    }
+
+    void CancelPieceSelection()
+    {
+        if (currentState != InputState.None)
+        {
+            currentState = InputState.None;
+            DeselectSquare(selectedPieceSquare);
+            ResetPiecePosition(selectedPieceSquare);
+        }
+    }
+
+    void ResetPiecePosition((int rank, int file) square)
+    {
+        int index = BoardRepresentation.IndexFromCoord((int)square.rank, (int)square.file);
+        Piece piece = pieces[index];
+        piece.Position = PositionFromIndex(index);
+    }
+
+    void DragPiece((int Rank, int File) pieceCoord, Vector2 mousePos)
+    {
+        int index = BoardRepresentation.IndexFromCoord((int)pieceCoord.Rank, (int)pieceCoord.File);
+        if (index < 0 || index > 63) return;
+        Piece piece = pieces[index];
+        piece.Position = mousePos;
+        piece.ZIndex = 2;
+    }
+
+    void SelectSquare((int rank, int file) square)
+    {
+        SetSquareHighlightColor(((int)square.rank, (int)square.file), BoardColors.lightSquares.highlightMove, BoardColors.darkSquares.highlightMove);
+    }
+
+    void DeselectSquare((int rank, int file) square)
+    {
+        SetSquareHighlightColor(((int)square.rank, (int)square.file), BoardColors.lightSquares.normal, BoardColors.darkSquares.normal);
+    }
+
+
+
+
+    // returns internal representation of Square clicked on
+    private (int rank, int file) GetSquareFromMouse(Vector2 mousePos)
+    {
+        int file = Math.Clamp(((int)mousePos.X) / ((int)tileSizeInPx), 0, 7);
+        int rank = Math.Clamp(7 - (int)(mousePos.Y / tileSizeInPx), 0, 7);
+
+        if (!fromWhitePerspective)
+        {
+            rank = 7 - rank;
+            file = 7 - file;
+        }
+        return (rank, file);
+    }
+
 
 
     void CreateBoardUi()
@@ -97,8 +284,13 @@ public partial class BoardUI : Node2D
             {
                 Square square = squareScene.Instantiate() as Square;
                 tileContainer.AddChild(square);
-                square.Position = new Vector2(file * tileSizeInPx, rank * tileSizeInPx);
-                bool isLight = (rank + file) % 2 == 0;
+
+                var coord = (rank, file);
+                var visCoord = CoordUtil.FlipForPerspective(coord, true);
+                float x = visCoord.file * tileSizeInPx;
+                float y = (7 - visCoord.rank) * tileSizeInPx;
+                square.Position = new Vector2(x, y);
+                bool isLight = (rank + file) % 2 != 0;
                 square.Setup(isLight, new Vector2(tileSizeInPx, tileSizeInPx));
                 squares[BoardRepresentation.IndexFromCoord(rank, file)] = square;
             }
@@ -108,10 +300,10 @@ public partial class BoardUI : Node2D
     public void SetPerspective(int color)
     {
         fromWhitePerspective = color == Chess.Piece.White;
-        UpdatePosition(board);
+        UpdatePosition();
     }
 
-    public void UpdatePosition(Board board)
+    public void UpdatePosition()
     {
 
         for (int i = 0; i < pieces.Length; i++)
@@ -127,7 +319,7 @@ public partial class BoardUI : Node2D
         {
             for (int file = 0; file < BoardDimension; file++)
             {
-                int pieceCode = board.Squares[BoardRepresentation.IndexFromCoord(rank, file)];
+                int pieceCode = logicBoard.Squares[BoardRepresentation.IndexFromCoord(rank, file)];
                 if (pieceCode == Chess.Piece.None) continue;
                 SpawnPiece((rank, file), pieceCode);
 
@@ -137,7 +329,8 @@ public partial class BoardUI : Node2D
 
     void SetSquareHighlightColor((int rank, int file) coord, Color lightColor, Color darkColor)
     {
-        Square square = squares[BoardRepresentation.IndexFromCoord(coord.rank, coord.file)];
+        var visCoord = CoordUtil.FlipForPerspective(coord, fromWhitePerspective);
+        Square square = squares[BoardRepresentation.IndexFromCoord(visCoord.rank, visCoord.file)];
         square.SetHighlightColor(square.isLight ? lightColor : darkColor);
     }
 
@@ -159,11 +352,10 @@ public partial class BoardUI : Node2D
 
     Vector2 PositionFromIndex(int index)
     {
-        int displayIndex = BoardRepresentation.PerspectiveIndex(index, fromWhitePerspective);
-
-        (int rank, int file) coord = BoardRepresentation.CoordFromIndex(displayIndex);
-        int x = coord.file * tileSizeInPx + tileSizeInPx / 2;
-        int y = (int)BoardSize.X - (coord.rank * tileSizeInPx + tileSizeInPx / 2);
+        (int rank, int file) coord = BoardRepresentation.CoordFromIndex(index);
+        (int rank, int file) visCoord = CoordUtil.FlipForPerspective(coord, fromWhitePerspective);
+        int x = visCoord.file * tileSizeInPx + tileSizeInPx / 2;
+        int y = (7 - visCoord.rank) * tileSizeInPx + tileSizeInPx / 2;
 
         return new Vector2(x, y);
     }
