@@ -99,7 +99,6 @@ namespace Chess.Testing
                 // Reached leaf node, count as 1
                 return 1;
             }
-
             List<Move> moves = board.GenerateLegalMoves();
             int numLocalNodes = 0;
 
@@ -121,7 +120,8 @@ namespace Chess.Testing
         }
         public int Search(int depth)
         {
-            List<Move> moves = board.GenerateLegalMoves();
+            var moves = board.GenerateLegalMoves();
+
 
             if (depth == 1)
             {
@@ -132,13 +132,12 @@ namespace Chess.Testing
 
             for (int i = 0; i < moves.Count; i++)
             {
+
                 board.MakeMove(moves[i]);
                 int numMovesForThisNode = Search(depth - 1);
                 numLocalNodes += numMovesForThisNode;
                 board.UnmakeMove(moves[i]);
-
             }
-
             return numLocalNodes;
 
         }

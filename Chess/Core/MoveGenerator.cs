@@ -13,12 +13,7 @@ namespace Chess
     public class MoveGenerator
     {
         List<Move> moves;
-        bool whiteToMove;
         // N E S W, NE, SE, SW, NW
-        readonly int[] directionOffsets = [8, 1, -8, -1, 9, -7, -9, 7];
-        readonly int[] knightOffsets = [17, 10, -6, -15, -17, -10, 6, 15];
-
-        readonly int[] castleOffsets = [-2, +2];
         readonly int[] whitePromotionPieces = [Piece.WhiteQueen, Piece.WhiteBishop,
         Piece.WhiteKnight, Piece.WhiteRook];
 
@@ -27,9 +22,11 @@ namespace Chess
         int myColor;
 
         Board board;
+        MovementData moveData;
 
         public List<Move> GeneratePseudoLegalMoves(Board board, int color, bool excludeKingMoves = false)
         {
+            moveData = new();
             this.board = board;
             Init(color);
             for (int squareIndex = 0; squareIndex < board.Squares.Length; squareIndex++)
@@ -79,9 +76,9 @@ namespace Chess
                 while (true)
                 {
                     int prevSquare = targetSquare;
-                    targetSquare += directionOffsets[i];
+                    targetSquare += moveData.directionOffsets[i];
 
-                    if (!IsOnBoard(prevSquare, targetSquare, directionOffsets[i])) break;
+                    if (!IsOnBoard(prevSquare, targetSquare, moveData.directionOffsets[i])) break;
 
                     int targetSquarePiece = board.Squares[targetSquare];
 
@@ -140,8 +137,9 @@ namespace Chess
             }
             //capture moves
             int[] captureOffsets = { direction + 1, direction - 1 };
-            foreach (int offset in captureOffsets)
+            for (int i = 0; i < captureOffsets.Length; i++)
             {
+                int offset = captureOffsets[i];
                 //normal capture
                 int targetSquare = fromSquare + offset;
                 if (!IsOnBoard(fromSquare, targetSquare, offset)) continue;
@@ -179,16 +177,18 @@ namespace Chess
         void GeneratePromotionMoves(int fromSquare, int toSquare, int movingPiece, int capturedPiece)
         {
             int[] promotionPiece = board.ColourToMove == Piece.White ? whitePromotionPieces : blackPromotionPieces;
-            foreach (int _promotionPiece in promotionPiece)
+            for (int i = 0; i < promotionPiece.Length; i++)
             {
+                int _promotionPiece = promotionPiece[i];
                 moves.Add(new Move(fromSquare, toSquare, movingPiece, capturedPiece, _promotionPiece, false, false));
             }
         }
 
         void GenerateKnightPieceMoves(int fromSquare, int pieceCode)
         {
-            foreach (int offset in knightOffsets)
+            for (int i = 0; i < moveData.knightOffsets.Length; i++)
             {
+                int offset = moveData.knightOffsets[i];
                 int targetSquare = fromSquare + offset;
                 if (!IsKnightOnBoard(fromSquare, targetSquare)) continue;
 
@@ -203,8 +203,9 @@ namespace Chess
         void GenerateKingPieceMoves(int fromSquare, int pieceCode)
         {
             // check normal moves
-            foreach (int offset in directionOffsets)
+            for (int i = 0; i < moveData.directionOffsets.Length; i++)
             {
+                int offset = moveData.directionOffsets[i];
                 int targetSquare = fromSquare + offset;
                 if (!IsOnBoard(fromSquare, targetSquare, offset)) continue;
 
@@ -243,57 +244,117 @@ namespace Chess
             int[] squaresToCheck = isKingside ? [fromSquare + 1, fromSquare + 2] : [fromSquare - 1, fromSquare - 2, fromSquare - 3];
 
             // check if path is clear
-            foreach (int square in squaresToCheck)
+            for (int i = 0; i < squaresToCheck.Length; i++)
             {
+                int square = squaresToCheck[i];
                 if (board.Squares[square] != Piece.None) return false;
             }
 
             //check if current or one of the path squares is under Attack 
             squaresToCheck = [fromSquare, squaresToCheck[0], squaresToCheck[1]];
-            foreach (int square in squaresToCheck)
+            for (int i = 0; i < squaresToCheck.Length; i++)
             {
-                if (IsSquareAttacked(square, -myColor)) return false;
+                int square = squaresToCheck[i];
+                if (IsSquareAttacked(square, -myColor, board)) return false;
             }
 
             return true;
         }
 
-        public bool IsSquareAttacked(int square, int byColor)
+        public bool IsSquareAttacked(int square, int byColor, Board board)
         {
-            //check enemyKing
-            foreach (int offset in directionOffsets)
+            moveData = new();
+            int[] pawnAttackOffsets = byColor == Piece.Black ? moveData.whitePawnAttackOffsets : moveData.blackPawnAttackOffsets;
+            int[] knightAttackOffsets = moveData.knightOffsets;
+            int[] kingAttackoffsets = moveData.directionOffsets;
+            int[] bishopAttackOffsets = moveData.directionOffsets[4..8];
+            int[] rookAttackOffsets = moveData.directionOffsets[0..4];
+
+            //check  pawn Attacks;
+            //attackOffsets are reversed, because we check from the square, which is attacked.
+            for (int i = 0; i < pawnAttackOffsets.Length; i++)
             {
-                int kingSquare = square + offset;
-                if (!IsOnBoard(kingSquare, square, offset)) continue;
-                int piece = board.Squares[kingSquare];
-                if (Math.Abs(piece) == Piece.WhiteKing && Piece.GetColor(piece) == byColor)
-                {
-                    return true;
-                }
+                int offset = pawnAttackOffsets[i];
+                int attackerSquare = square + offset;
+                if (!IsOnBoard(attackerSquare, square, offset)) continue;
+                bool isRightPiece = Math.Abs(board.Squares[attackerSquare]) == Piece.WhitePawn;
+                bool isRightColor = Piece.IsColor(board.Squares[attackerSquare], byColor);
+                if (isRightColor && isRightPiece) return true;
             }
 
-            //check enemy pawns attackPattern
-            for (int i = 0; i < Board.BoardSize; i++)
+            //check Knight Attacks
+            for (int i = 0; i < knightAttackOffsets.Length; i++)
             {
-                int piece = board.Squares[i];
-                if (Math.Abs(piece) == Piece.WhitePawn && Piece.IsColor(piece, byColor))
+                int offset = knightAttackOffsets[i];
+                int attackerSquare = square + offset;
+                if (!IsKnightOnBoard(attackerSquare, square)) continue;
+                bool isRightPiece = Math.Abs(board.Squares[attackerSquare]) == Piece.WhiteKnight;
+                bool isRightColor = Piece.IsColor(board.Squares[attackerSquare], byColor);
+                if (isRightColor && isRightPiece) return true;
+            }
+
+            // check King Attacks
+            for (int i = 0; i < kingAttackoffsets.Length; i++)
+            {
+                int offset = kingAttackoffsets[i];
+                int attackerSquare = square + offset;
+                if (!IsOnBoard(attackerSquare, square, offset)) continue;
+                bool isRightPiece = Math.Abs(board.Squares[attackerSquare]) == Piece.WhiteKing;
+                bool isRightColor = Piece.IsColor(board.Squares[attackerSquare], byColor);
+                if (isRightColor && isRightPiece) return true;
+            }
+
+            //check sliding pieces
+            //check rook and Queen 
+            for (int i = 0; i < rookAttackOffsets.Length; i++)
+            {
+                int offset = rookAttackOffsets[i];
+
+                int attackerSquare = square;
+                while (true)
                 {
-                    int[] attackOffsets = Piece.IsWhite(piece) ? [7, 9] : [-9, -7];
-                    foreach (int offset in attackOffsets)
+                    int prevSquare = attackerSquare;
+                    attackerSquare += offset;
+                    if (!IsOnBoard(attackerSquare, prevSquare, offset)) break;
+
+                    int piece = board.Squares[attackerSquare];
+                    if (piece != Piece.None)
                     {
-                        if (i + offset == square) return true;
+                        bool isRook = Math.Abs(piece) == Piece.WhiteRook;
+                        bool isQueen = Math.Abs(piece) == Piece.WhiteQueen;
+                        bool isRightPiece = isRook || isQueen;
+                        bool isRightColor = Piece.IsColor(piece, byColor);
+                        if (isRightPiece && isRightColor) return true;
+
+                        break;
                     }
                 }
             }
 
-
-
-            MoveGenerator generator = new();
-            List<Move> enemeyMoves = generator.GeneratePseudoLegalMoves(board, byColor, true);
-
-            foreach (Move move in enemeyMoves)
+            // check for Bishop and rooks
+            for (int i = 0; i < bishopAttackOffsets.Length; i++)
             {
-                if (move.To == square) return true;
+                int offset = bishopAttackOffsets[i];
+
+                int attackerSquare = square;
+                while (true)
+                {
+                    int prevSquare = attackerSquare;
+                    attackerSquare += offset;
+                    if (!IsOnBoard(attackerSquare, prevSquare, offset)) break;
+
+                    int piece = board.Squares[attackerSquare];
+                    if (piece != Piece.None)
+                    {
+                        bool isBishop = Math.Abs(piece) == Piece.WhiteBishop;
+                        bool isQueen = Math.Abs(piece) == Piece.WhiteQueen;
+                        bool isRightPiece = isBishop || isQueen;
+                        bool isRightColor = Piece.IsColor(piece, byColor);
+                        if (isRightPiece && isRightColor) return true;
+
+                        break;
+                    }
+                }
             }
             return false;
         }
@@ -312,7 +373,7 @@ namespace Chess
             int targetCol = to % 8;
 
             // For horizontal and diagonal moves, the column difference must be exactly 1
-            if (directionOffsets.Contains(direction) &&
+            if (moveData.directionOffsets.Contains(direction) &&
                 Math.Abs(targetCol - fromCol) > 1)
             {
                 return false;
@@ -324,12 +385,12 @@ namespace Chess
 
         bool IsKnightOnBoard(int from, int to)
         {
-            if (to < 0 || to > 63) return false;
-            int fromRow = Board.GetCoords(from).row;
-            int toRow = Board.GetCoords(to).row;
+            if (to < 0 || to > 63 || from < 0 || from > 63) return false;
+            int fromRow = from / 8;
+            int toRow = to / 8;
 
-            int fromCol = Board.GetCoords(from).col;
-            int toCol = Board.GetCoords(to).col;
+            int fromCol = from % 8;
+            int toCol = to % 8;
 
             int colDiff = Math.Abs(fromCol - toCol);
             int rowDiff = Math.Abs(fromRow - toRow);

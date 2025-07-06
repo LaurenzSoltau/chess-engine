@@ -13,6 +13,8 @@ namespace Chess
         public const int BoardSize = 64;
 
         public int[] Squares;
+        public int[] kings;
+
         public int EnPassantSquare;
         public int HalfMoveClock;
         public int FullMoveClock;
@@ -185,6 +187,7 @@ namespace Chess
         {
             Squares = new int[BoardSize];
             EnPassantSquare = -1;
+            kings = new int[2];
         }
 
         public void LoadPosition(String fenString)
@@ -235,11 +238,13 @@ namespace Chess
         public void MakeMove(Move move)
         {
             // updating enPassant Square
-            UnmakeMoveInformation safeInfo = new();
-            safeInfo.oldCastlingRights = Castling;
-            safeInfo.oldEnPassantSquare = EnPassantSquare;
-            safeInfo.oldHalfMoveClock = HalfMoveClock;
-            safeInfo.oldFullMoveClock = FullMoveClock;
+            UnmakeMoveInformation safeInfo = new()
+            {
+                oldCastlingRights = Castling,
+                oldEnPassantSquare = EnPassantSquare,
+                oldHalfMoveClock = HalfMoveClock,
+                oldFullMoveClock = FullMoveClock
+            };
             unmakeMoveInformation.Push(safeInfo);
 
             UpdateEnPassantSquare(move);
@@ -442,8 +447,9 @@ namespace Chess
 
             var pseudoMoves = moveGenerator.GeneratePseudoLegalMoves(this, ColourToMove);
 
-            foreach (Move move in pseudoMoves)
+            for (int i = 0; i < pseudoMoves.Count; i++)
             {
+                Move move = pseudoMoves[i];
                 MakeMove(move);
                 if (!IsKingInCheck(-ColourToMove))
                 {
@@ -459,26 +465,16 @@ namespace Chess
             int kingSquare = -1;
             for (int i = 0; i < Squares.Length; i++)
             {
-                if (Squares[i] == (color == Piece.White ? Piece.WhiteKing : Piece.BlackKing))
+                int piece = Squares[i];
+                if (piece == (color == Piece.White ? Piece.WhiteKing : Piece.BlackKing))
                 {
                     kingSquare = i;
                     break;
                 }
             }
-            int enemyColor = -color;
-            MoveGenerator generator = new();
-            List<Move> enemyMoves = generator.GeneratePseudoLegalMoves(this, enemyColor);
-
-            foreach (Move move in enemyMoves)
-            {
-                if (move.To == kingSquare)
-                {
-                    return true;
-                }
-            }
-            return false;
+            MoveGenerator gen = new();
+            return gen.IsSquareAttacked(kingSquare, -color, this);
         }
+
     }
-
-
 }

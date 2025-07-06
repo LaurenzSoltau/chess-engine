@@ -58,5 +58,5 @@ stretch = true
 
 [node name="SubViewport" type="SubViewport" parent="HBoxContainer/SubViewportContainer"]
 handle_input_locally = false
-size = Vector2i(851, 720)
+size = Vector2i(2, 2)
 render_target_update_mode = 4

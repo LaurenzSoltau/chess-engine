@@ -29,7 +29,7 @@ namespace Chess.Bot
             foreach (Move move in legalMoves)
             {
                 board.MakeMove(move);
-                int eval = -Search(999999, -999999 ,depth - 1);
+                int eval = -Search(-999999, 999999 ,depth - 1);
                 board.UnmakeMove(move);
 
                 if (eval > bestEval)

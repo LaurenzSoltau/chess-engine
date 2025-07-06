@@ -32,7 +32,7 @@ public partial class TestSuite : Control
     void HandleButtonPressed(TestButton button)
     {
         int index = button.testIndex - 1;
-        tester.RunSingleTest(index, false);
+        tester.RunSingleTest(index, true);
         var label = TestLabelScene.Instantiate<TestLabel>();
         labelContainer.AddChild(label);
         Perft.TestResults testResults = tester.testResults[index];

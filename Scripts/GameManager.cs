@@ -184,12 +184,12 @@ public partial class GameManager : Control
     async void MakeAiMove()
     {
         int thisGameId = gameId;
-        await Task.Delay(200);
+        await Task.Delay(20);
         if (thisGameId != gameId)
         {
             return;
         }
-        ai.StartSearch(4);
+        ai.StartSearch(5);
         Move move = ai.bestMove;
 
         board.MakeMove(move);
@@ -205,7 +205,7 @@ public partial class GameManager : Control
         var legalMoves = board.GenerateLegalMoves();
         if (legalMoves.Count == 0)
         {
-            if (board.IsKingInCheck(-colorToMove))
+            if (board.IsKingInCheck(colorToMove))
             {
                 gameState = (colorToMove == Chess.Piece.White) ? GameState.WhiteIsMated : GameState.BlackIsMated;
             }
