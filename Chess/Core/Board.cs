@@ -4,6 +4,8 @@ namespace Chess
 {
     using System;
     using System.Collections.Generic;
+    using System.Linq;
+    using Godot;
 
     public class Board
     {
@@ -18,6 +20,7 @@ namespace Chess
         public PieceList[] knights;
         public PieceList[] rooks;
         public PieceList[] queens;
+        public PieceList[][] AllPieceLists;
 
         public int EnPassantSquare;
         public int HalfMoveClock;
@@ -39,7 +42,7 @@ namespace Chess
 
         }
 
-        public UnmakeMoveInformation[] unmakeMoveInformationTest = new UnmakeMoveInformation[100];
+        public UnmakeMoveInformation[] unmakeMoveInformationTest = new UnmakeMoveInformation[1000];
         public int plyCount;
          
         public int ColourToMove;
@@ -184,47 +187,55 @@ namespace Chess
             knights = [new(10), new(10)];
             rooks = [new(10), new(10)];
             queens = [new(9), new(9)];
+            AllPieceLists = [
+                queens,
+                pawns,
+                rooks,
+                knights,
+                bishops    
+            ];
         }
+
+        public PieceList GetPieceList(int piece)
+        {
+            int colorIndex = piece < 0 ? 1 : 0;
+            int pieceIndex = Math.Abs(piece) - 2;
+            return AllPieceLists[pieceIndex][colorIndex];
+        }
+
 
         public void LoadPosition(String fenString)
         {
             PositionInfo posInfo = FenUtil.PositionInfoFromFen(fenString);
             Init();
-
-            Squares = posInfo.Squares;
             EnPassantSquare = posInfo.EnPassantSquare;
             ColourToMove = posInfo.WhiteToMove ? Piece.White : Piece.Black;
 
-            if (posInfo.WhiteCastleKingside)
+            //load squares and piecelists
+            for (int i = 0; i < posInfo.Squares.Length; i++)
             {
-                CastlingRights |= WhiteKingsideMask;
+                int piece = posInfo.Squares[i];
+                if (piece == Piece.None) continue;
+                Squares[i] = piece;
+
+                if (Math.Abs(piece) != Piece.WhiteKing)
+                {
+                    PieceList pieceList = GetPieceList(piece);
+                    pieceList.AddPiece(i);
+                }
+                else
+                {
+                    kings[piece > 0 ? 0 : 1] = i;
+                }
             }
-            if (posInfo.WhiteCastleQueenside)
-            {
-                CastlingRights |= WhiteQueensideMask;
-            }
-            if (posInfo.BlackCastleKingside)
-            {
-                CastlingRights |= BlackKingsideMask;
-            }
-            if (posInfo.BlackCastleQueenside)
-            {
-                CastlingRights |= BlackQueensideMask;
-            }
+
+            //Load Castle Rights from Posinfo
+            if (posInfo.WhiteCastleKingside) CastlingRights |= WhiteKingsideMask;
+            if (posInfo.WhiteCastleQueenside) CastlingRights |= WhiteQueensideMask;
+            if (posInfo.BlackCastleKingside) CastlingRights |= BlackKingsideMask;
+            if (posInfo.BlackCastleQueenside) CastlingRights |= BlackQueensideMask;
             HalfMoveClock = posInfo.HalfMoveClock;
             FullMoveClock = posInfo.FullMoveClock;
-        }
-
-        void UpdateHalfMoveClock(Move move)
-        {
-            if (move.CapturedPiece != Piece.None || Math.Abs(move.MovingPiece) == Piece.WhitePawn)
-            {
-                HalfMoveClock = 0;
-            }
-            else
-            {
-                HalfMoveClock++;
-            }
         }
 
         void UpdateFullMoveClock(Move move)
@@ -236,13 +247,7 @@ namespace Chess
         }
         public void MakeMove(Move move)
         {
-            int fromSquare = move.From;
-            int toSquare = move.To;
-            int fromRow = fromSquare / 8;
-            int toRow = toSquare / 8;
-            int movingPiece = move.MovingPiece;
-
-
+            // Store moveInfo for Unmake move
             UnmakeMoveInformation safeInfo = new()
             {
                 oldCastlingRights = CastlingRights,
@@ -253,23 +258,27 @@ namespace Chess
             unmakeMoveInformationTest[plyCount] = safeInfo;
             plyCount++;
 
-            // Update EnPassant Square
-            EnPassantSquare = -1;
-            if (Math.Abs(fromRow - toRow) == 2 && Math.Abs(movingPiece) == Piece.WhitePawn)
-            {
-                EnPassantSquare = (fromSquare + toSquare) / 2;
-            }
+            
+            int fromSquare = move.From;
+            int toSquare = move.To;
+            int fromRow = fromSquare / 8;
+            int toRow = toSquare / 8;
+
+            int movingPiece = move.MovingPiece;
+            int capturedPiece = move.CapturedPiece;
+
+            bool isCastling = move.IsCastling;
+            bool isEnPassant = move.IsEnPassant;
+            bool captureMove = move.CapturedPiece != Piece.None;
 
 
-            //castling Rights
-            UpdateCastleRights(move);
 
             //handle en passant
-            if (move.IsEnPassant)
-            {
-                int captureSquare = toSquare + (ColourToMove == Piece.White ? -8 : 8);
-                Squares[captureSquare] = Piece.None;
-            }
+                if (move.IsEnPassant)
+                {
+                    int captureSquare = toSquare + (ColourToMove == Piece.White ? -8 : 8);
+                    Squares[captureSquare] = Piece.None;
+                }
 
             // Handle castling
             if (move.IsCastling)
@@ -304,10 +313,17 @@ namespace Chess
 
             Squares[fromSquare] = Piece.None;
 
-            UpdateHalfMoveClock(move);
-            UpdateFullMoveClock(move);
+
+            // Update Gamestate
+            EnPassantSquare = (Math.Abs(fromRow - toRow) == 2 && Math.Abs(movingPiece) == Piece.WhitePawn) ? (fromSquare + toSquare) / 2 : -1;
+            UpdateCastleRights(move);
+            HalfMoveClock = (Math.Abs(movingPiece) == Piece.WhitePawn || capturedPiece != Piece.None) ? 0 : HalfMoveClock++;
+            FullMoveClock = ColourToMove == Piece.Black ? FullMoveClock++ : FullMoveClock; 
             ColourToMove = ColourToMove == Piece.White ? Piece.Black : Piece.White;
         }
+
+
+
 
         public void UnmakeMove(Move move)
         {
