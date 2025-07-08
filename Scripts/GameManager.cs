@@ -14,6 +14,8 @@ public partial class GameManager : Control
     [Export]
     SubViewport SubViewport;
     VBoxContainer sideBar;
+    RichTextLabel searchDiagnosticsLabel;
+
     [Signal]
     public delegate void HumanTurnEventHandler();
     public BoardUI boardUi;
@@ -41,6 +43,7 @@ public partial class GameManager : Control
     {
         boardUi = boardUIPackedScene.Instantiate() as BoardUI;
         sideBar = GetNode<VBoxContainer>("HBoxContainer/MarginContainer/SideBar");
+        searchDiagnosticsLabel = GetNode<RichTextLabel>("HBoxContainer/MarginContainer/SideBar/RichTextLabel");
         SubViewport.AddChild(boardUi);
         boardUi.AttempMakeMove += OnMoveAttempted;
         foreach (Node child in GetNode<VBoxContainer>("HBoxContainer/MarginContainer/SideBar").GetChildren())
@@ -80,7 +83,8 @@ public partial class GameManager : Control
         Move legalMove = new();
         bool isLegal = false;
 
-        var legalMoves = board.GenerateLegalMoves();
+        MoveGenerator gen = new();
+        var legalMoves = gen.GenerateLegalMoves(board, board.ColourToMove);
         foreach (Move move in legalMoves)
         {
             if (move.From == fromIndex && move.To == toIndex)
@@ -189,23 +193,35 @@ public partial class GameManager : Control
         {
             return;
         }
-        ai.StartSearch(5);
+        ai.StartSearch(4);
         Move move = ai.bestMove;
+        if (!move.isValid)
+        {
+            GD.Print("test");
+            UpdateGameState();
+            return;
+        }
 
         board.MakeMove(move);
         boardUi.UpdatePosition();
         boardUi.OnAiTurn(move);
         UpdateGameState();
-
+        UpdateSearchDiagnostics(ai.botDiagnostics);
         SwitchTurn();
+    }
+
+    void UpdateSearchDiagnostics(BotDiagnostics diagnostics)
+    {
+        searchDiagnosticsLabel.Text = $"Time searched: {diagnostics.searchTimeMs}ms\nEval: {diagnostics.eval}\nDepth searched: {diagnostics.depthSearched}";
     }
 
     void UpdateGameState()
     {
-        var legalMoves = board.GenerateLegalMoves();
+        MoveGenerator gen = new();
+        var legalMoves = gen.GenerateLegalMoves(board, board.ColourToMove);
         if (legalMoves.Count == 0)
         {
-            if (board.IsKingInCheck(colorToMove))
+            if (board.IsKingInCheck(-colorToMove))
             {
                 gameState = (colorToMove == Chess.Piece.White) ? GameState.WhiteIsMated : GameState.BlackIsMated;
             }

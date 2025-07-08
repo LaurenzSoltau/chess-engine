@@ -1,3 +1,4 @@
+Nodes searched: 43
 a6b5: 1
 a6b7: 1
 a6c4: 1
@@ -21,6 +22,7 @@ e7c5: 1
 e7d6: 1
 e7d8: 1
 e7f8: 1
+e8c8: 1
 e8d8: 1
 e8f8: 1
 e8g8: 1
@@ -40,3 +42,4 @@ h8h4: 1
 h8h5: 1
 h8h6: 1
 h8h7: 1
+info string Available processors: 0-7

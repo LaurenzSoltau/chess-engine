@@ -126,7 +126,8 @@ public partial class BoardUI : Node2D
 
     void HighlightLegalMoves()
     {
-        var legalMoves = logicBoard.GenerateLegalMoves();
+        MoveGenerator gen = new();
+        var legalMoves = gen.GenerateLegalMoves(logicBoard, logicBoard.ColourToMove);
         int selectedMoveIndex = BoardRepresentation.IndexFromCoord(selectedPieceSquare.rank, selectedPieceSquare.file);
         foreach (Move move in legalMoves) {
 

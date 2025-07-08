@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using Godot;
@@ -7,29 +8,37 @@ namespace Chess.Bot
 {
     public class Searcher
     {
+
+        const int immediateMateScore = 100000;
+        const int positiveInfinity = 9999999;
+        const int negativeInfinity = -positiveInfinity;
         public Move bestMove;
-        int bestEval;
+        public BotDiagnostics botDiagnostics;
+        int depthSearched;
 
-        Board board;
-        Evaluation evaluation;
-        int rootDepth;
-
+        readonly Board board;
+        readonly Evaluation evaluation;
+        readonly MoveGenerator moveGenerator;
 
         public Searcher(Board board)
         {
             this.board = board;
+            moveGenerator = new();
             evaluation = new Evaluation();
         }
 
         public void StartSearch(int depth)
         {
-            var legalMoves = board.GenerateLegalMoves();
-            var bestEval = -99999;
-
+            depthSearched = 0;
+            var legalMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove);
+            var bestEval = negativeInfinity;
+            bestMove = new();
+            var sw = new Stopwatch();
+            sw.Start();
             foreach (Move move in legalMoves)
             {
                 board.MakeMove(move);
-                int eval = -Search(-999999, 999999 ,depth - 1);
+                int eval = -Search(negativeInfinity, positiveInfinity, depth - 1);
                 board.UnmakeMove(move);
 
                 if (eval > bestEval)
@@ -38,26 +47,28 @@ namespace Chess.Bot
                     bestMove = move;
                 }
             }
+            sw.Stop();
+            botDiagnostics = new((int)sw.ElapsedMilliseconds, bestEval, depthSearched);
         }
 
         int Search(int alpha, int beta, int depth)
         {
             if (depth == 0)
             {
-                return evaluation.Evaluate(board);
+                return Quiesence(alpha, beta, 5);
             }
-            var legalMoves = board.GenerateLegalMoves();
+            var legalMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove);
 
             if (legalMoves.Count == 0)
             {
-                return board.IsKingInCheck(board.ColourToMove) ? -99999 : 0;
+                return board.IsKingInCheck(board.ColourToMove) ? -immediateMateScore : 0;
             }
 
             int bestEval = -9999999;
             foreach (Move move in legalMoves)
             {
                 board.MakeMove(move);
-                int eval = -Search(-alpha, -beta, depth - 1);
+                int eval = -Search(-beta, -alpha, depth - 1);
                 board.UnmakeMove(move);
 
                 bestEval = Math.Max(eval, bestEval);
@@ -65,9 +76,42 @@ namespace Chess.Bot
 
                 if (alpha >= beta) break;
             }
-
-
             return bestEval;
+        }
+
+        int Quiesence(int alpha, int beta, int qDepth)
+        {
+            depthSearched++;
+            if (qDepth == 0)
+            {
+                return evaluation.Evaluate(board);
+            }
+
+            int standPat = evaluation.Evaluate(board);
+
+            if (standPat >= beta)
+            {
+                return beta;
+            }
+
+            if (alpha < standPat)
+            {
+                alpha = standPat;
+            }
+
+            var captureMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove, true);
+
+            foreach (var move in captureMoves)
+            {
+                board.MakeMove(move);
+                int score = -Quiesence(-beta, -alpha, qDepth - 1);
+                board.UnmakeMove(move);
+
+                if (score >= beta) return beta;
+
+                if (score > alpha) alpha = score;
+            }
+            return alpha;
         }
     }
 }

@@ -10,6 +10,7 @@ namespace Chess
         public bool IsEnPassant { get; }
         public bool IsCastling { get; }
         public int movingPieceColor { get; }
+        public bool isValid { get; }
 
         public Move(
             int from, int to, int movingPiece, int capturedPiece = 0,
@@ -25,7 +26,9 @@ namespace Chess
             IsEnPassant = isEnPassant;
             IsCastling = isCastling;
             movingPieceColor = Piece.GetColor(movingPiece);
+            isValid = true;
+
         }
-        public Move() { }
+        public Move() { isValid = false; }
     }
 }

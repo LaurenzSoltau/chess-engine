@@ -29,6 +29,7 @@ namespace Chess.Testing
         Board board;
         public TimeSpan lastTestElapsedTime;
         public TimeSpan totalElapsedTime;
+        MoveGenerator moveGenerator;
 
         public Perft()
         {
@@ -41,6 +42,7 @@ namespace Chess.Testing
             tests = TestUtil.GetTests();
             testResults = new TestResults[tests.Length];
             board = new Board();
+            moveGenerator = new();
         }
 
         public void RunSingleTestFen(string fen, int depth)
@@ -99,7 +101,7 @@ namespace Chess.Testing
                 // Reached leaf node, count as 1
                 return 1;
             }
-            List<Move> moves = board.GenerateLegalMoves();
+            List<Move> moves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove); 
             int numLocalNodes = 0;
 
             foreach (var move in moves)
@@ -120,23 +122,22 @@ namespace Chess.Testing
         }
         public int Search(int depth)
         {
-            var moves = board.GenerateLegalMoves();
-
+            var pseudoLegalMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove); 
 
             if (depth == 1)
             {
-                return moves.Count;
+                return pseudoLegalMoves.Count;
             }
 
             int numLocalNodes = 0;
 
-            for (int i = 0; i < moves.Count; i++)
+            for (int i = 0; i < pseudoLegalMoves.Count; i++)
             {
 
-                board.MakeMove(moves[i]);
+                board.MakeMove(pseudoLegalMoves[i]);
                 int numMovesForThisNode = Search(depth - 1);
                 numLocalNodes += numMovesForThisNode;
-                board.UnmakeMove(moves[i]);
+                board.UnmakeMove(pseudoLegalMoves[i]);
             }
             return numLocalNodes;
 
@@ -144,13 +145,11 @@ namespace Chess.Testing
 
         void WritePerftDivideResults()
         {
-            using (StreamWriter writer = new StreamWriter(TestUtil.PERFTDIVIDERESULTSPATH))
+            using StreamWriter writer = new(TestUtil.PERFTDIVIDERESULTSPATH);
+            foreach (var kvp in PerftDivideResults)
             {
-                foreach (var kvp in PerftDivideResults)
-                {
-                    writer.WriteLine($"{kvp.Key}: {kvp.Value}");
+                writer.WriteLine($"{kvp.Key}: {kvp.Value}");
 
-                }
             }
         }
 

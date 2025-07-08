@@ -1,12 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Reflection.PortableExecutable;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using Godot;
 
 namespace Chess
 {
@@ -20,14 +14,38 @@ namespace Chess
         readonly int[] blackPromotionPieces = [Piece.BlackQueen, Piece.BlackBishop,
         Piece.BlackKnight, Piece.BlackRook];
         int myColor;
+        bool onlyCapturesAndPromotions;
 
         Board board;
         MovementData moveData;
 
-        public List<Move> GeneratePseudoLegalMoves(Board board, int color, bool excludeKingMoves = false)
+        public MoveGenerator()
         {
             moveData = new();
+        }
+
+        public List<Move> GenerateLegalMoves(Board board, int color, bool onlyCapturesAndPromotions = false)
+        {
+            var pseudoLegalMoves = GeneratePseudoLegalMoves(board, color, onlyCapturesAndPromotions);
+            List<Move> legalMoves = [];
+            for (int i = 0; i < pseudoLegalMoves.Count; i++)
+            {
+                Move move = pseudoLegalMoves[i];
+                board.MakeMove(move);
+                if (!board.IsKingInCheck(-board.ColourToMove))
+                {
+                    legalMoves.Add(move);
+                }
+                board.UnmakeMove(move);
+
+            }
+            return legalMoves;
+        }
+
+        public List<Move> GeneratePseudoLegalMoves(Board board, int color, bool onlyCapturesAndPromotions = false, bool excludeKingMoves = false)
+        {
             this.board = board;
+            this.onlyCapturesAndPromotions = onlyCapturesAndPromotions;
             Init(color);
             for (int squareIndex = 0; squareIndex < board.Squares.Length; squareIndex++)
             {
@@ -85,8 +103,19 @@ namespace Chess
                     // break if piece of same color is in the way;
                     if (Piece.IsColor(targetSquarePiece, myColor)) break;
 
-                    Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
-                    moves.Add(newMove);
+                    if (!onlyCapturesAndPromotions)
+                    {
+                        Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
+                        moves.Add(newMove);
+                    }
+                    else
+                    {
+                        if (targetSquarePiece != Piece.None)
+                        {
+                            Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
+                            moves.Add(newMove);
+                        }
+                    }
 
                     //break after capture.
                     if (targetSquarePiece != Piece.None) break;
@@ -99,7 +128,7 @@ namespace Chess
             int direction = Piece.IsWhite(pieceCode) ? 8 : -8;
             int startRank = Piece.IsWhite(pieceCode) ? 1 : 6;
             int promotionRank = Piece.IsWhite(pieceCode) ? 6 : 1;
-            int currentRank = Board.GetCoords(fromSquare).row;
+            int currentRank = fromSquare / 8;
             bool isOnPromotionRank = currentRank == promotionRank;
 
             int forwardOne = fromSquare + direction;
@@ -114,8 +143,11 @@ namespace Chess
                 }
                 else
                 {
-                    Move newMove = new(fromSquare, forwardOne, pieceCode);
-                    moves.Add(newMove);
+                    if (!onlyCapturesAndPromotions)
+                    {
+                        Move newMove = new(fromSquare, forwardOne, pieceCode);
+                        moves.Add(newMove);
+                    }
                 }
 
                 //double step
@@ -128,8 +160,11 @@ namespace Chess
                     }
                     else
                     {
-                        Move newMove = new(fromSquare, forwardTwo, pieceCode);
-                        moves.Add(newMove);
+                        if (!onlyCapturesAndPromotions)
+                        {
+                            Move newMove = new(fromSquare, forwardTwo, pieceCode);
+                            moves.Add(newMove);
+                        }
                     }
                 }
 
@@ -154,8 +189,11 @@ namespace Chess
                     }
                     else
                     {
-                        Move newMove = new(fromSquare, targetSquare, pieceCode, targetPiece);
-                        moves.Add(newMove);
+                        if (!onlyCapturesAndPromotions)
+                        {
+                            Move newMove = new(fromSquare, targetSquare, pieceCode, targetPiece);
+                            moves.Add(newMove);
+                        }
                     }
                 }
 
@@ -195,8 +233,19 @@ namespace Chess
                 int targetSquarePiece = board.Squares[targetSquare];
                 if (Piece.IsColor(targetSquarePiece, myColor)) continue;
 
-                Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
-                moves.Add(newMove);
+                if (!onlyCapturesAndPromotions)
+                {
+                    Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
+                    moves.Add(newMove);
+                }
+                else
+                {
+                    if (targetSquarePiece != Piece.None)
+                    {
+                        Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
+                        moves.Add(newMove);
+                    }
+                }
             }
         }
 
@@ -212,9 +261,22 @@ namespace Chess
                 int targetSquarePiece = board.Squares[targetSquare];
                 if (Piece.IsColor(targetSquarePiece, myColor)) continue;
 
-                Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
-                moves.Add(newMove);
+                if (!onlyCapturesAndPromotions)
+                {
+                    Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
+                    moves.Add(newMove);
+                }
+                else
+                {
+                    if (targetSquarePiece != Piece.None)
+                    {
+                        Move newMove = new(fromSquare, targetSquare, pieceCode, targetSquarePiece);
+                        moves.Add(newMove);
+                    }
+                }
+
             }
+            if (onlyCapturesAndPromotions) return;
 
             //check castle moves
             //kingside
@@ -263,7 +325,6 @@ namespace Chess
 
         public bool IsSquareAttacked(int square, int byColor, Board board)
         {
-            moveData = new();
             int[] pawnAttackOffsets = byColor == Piece.Black ? moveData.whitePawnAttackOffsets : moveData.blackPawnAttackOffsets;
             int[] knightAttackOffsets = moveData.knightOffsets;
             int[] kingAttackoffsets = moveData.directionOffsets;

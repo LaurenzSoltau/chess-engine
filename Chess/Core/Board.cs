@@ -4,44 +4,47 @@ namespace Chess
 {
     using System;
     using System.Collections.Generic;
-    using System.Diagnostics.Contracts;
-    using System.Security.Principal;
-    using Godot;
 
     public class Board
     {
         public const int BoardSize = 64;
 
         public int[] Squares;
+
+        // white is index 0, black is index 1
         public int[] kings;
+        public PieceList[] pawns;
+        public PieceList[] bishops;
+        public PieceList[] knights;
+        public PieceList[] rooks;
+        public PieceList[] queens;
 
         public int EnPassantSquare;
         public int HalfMoveClock;
         public int FullMoveClock;
-        public struct CastlingRights
-        {
-            public bool WhiteKingside;
-            public bool WhiteQueenside;
-            public bool BlackKingside;
-            public bool BlackQueenside;
-        }
 
-        public CastlingRights Castling;
+        const int WhiteKingsideMask = 1 << 0;
+        const int WhiteQueensideMask = 1 << 1;
+        const int BlackKingsideMask = 1 << 2;
+        const int BlackQueensideMask = 1 << 3;
+        public int CastlingRights;
+
 
         public struct UnmakeMoveInformation
         {
             public int oldEnPassantSquare;
-            public CastlingRights oldCastlingRights;
+            public int oldCastlingRights;
             public int oldHalfMoveClock;
             public int oldFullMoveClock;
 
         }
 
-        public Stack<UnmakeMoveInformation> unmakeMoveInformation = new();
-
+        public UnmakeMoveInformation[] unmakeMoveInformationTest = new UnmakeMoveInformation[100];
+        public int plyCount;
+         
         public int ColourToMove;
 
-        MoveGenerator moveGenerator;
+        readonly MoveGenerator moveGenerator;
 
         public Board()
         {
@@ -133,9 +136,9 @@ namespace Chess
             }
 
             if (whiteKnights + blackKnights == 0 &&
-    whiteRooksOrQueens + blackRooksOrQueens == 0 &&
-    whitePawns + blackPawns == 0 &&
-    (whiteBishops + blackBishops > 0))
+                whiteRooksOrQueens + blackRooksOrQueens == 0 &&
+                whitePawns + blackPawns == 0 &&
+                (whiteBishops + blackBishops > 0))
             {
                 if (AllBishopsOnSameColor(whiteBishopSquares, blackBishopSquares))
                     return true; // alle Läufer auf gleicher Farbe → Remis
@@ -168,52 +171,48 @@ namespace Chess
             int file = squareIndex % 8;
             return (rank + file) % 2 == 0;
         }
-        public Board Clone()
-        {
-            Board clone = new Board();
-            clone.Init();
-            for (int i = 0; i < Squares.Length; i++)
-            {
-                clone.Squares[i] = Squares[i];
-            }
-            clone.ColourToMove = this.ColourToMove;
-            clone.EnPassantSquare = this.EnPassantSquare;
-            clone.Castling = this.Castling;
-
-            return clone;
-        }
 
         void Init()
         {
+            plyCount = 0;
+            CastlingRights = 0;
             Squares = new int[BoardSize];
             EnPassantSquare = -1;
             kings = new int[2];
+            pawns = [new(8), new(8)];
+            bishops = [new(10), new(10)];
+            knights = [new(10), new(10)];
+            rooks = [new(10), new(10)];
+            queens = [new(9), new(9)];
         }
 
         public void LoadPosition(String fenString)
         {
             PositionInfo posInfo = FenUtil.PositionInfoFromFen(fenString);
             Init();
+
             Squares = posInfo.Squares;
             EnPassantSquare = posInfo.EnPassantSquare;
             ColourToMove = posInfo.WhiteToMove ? Piece.White : Piece.Black;
-            Castling.WhiteKingside = posInfo.WhiteCastleKingside;
-            Castling.WhiteQueenside = posInfo.WhiteCastleQueenside;
-            Castling.BlackKingside = posInfo.BlackCastleKingside;
-            Castling.BlackQueenside = posInfo.BlackCastleQueenside;
+
+            if (posInfo.WhiteCastleKingside)
+            {
+                CastlingRights |= WhiteKingsideMask;
+            }
+            if (posInfo.WhiteCastleQueenside)
+            {
+                CastlingRights |= WhiteQueensideMask;
+            }
+            if (posInfo.BlackCastleKingside)
+            {
+                CastlingRights |= BlackKingsideMask;
+            }
+            if (posInfo.BlackCastleQueenside)
+            {
+                CastlingRights |= BlackQueensideMask;
+            }
             HalfMoveClock = posInfo.HalfMoveClock;
             FullMoveClock = posInfo.FullMoveClock;
-        }
-
-        void UpdateEnPassantSquare(Move move)
-        {
-            EnPassantSquare = -1;
-            int fromRow = GetCoords(move.From).row;
-            int toRow = GetCoords(move.To).row;
-            if (Math.Abs(fromRow - toRow) == 2 && Math.Abs(move.MovingPiece) == Piece.WhitePawn)
-            {
-                EnPassantSquare = (move.From + move.To) / 2;
-            }
         }
 
         void UpdateHalfMoveClock(Move move)
@@ -237,17 +236,30 @@ namespace Chess
         }
         public void MakeMove(Move move)
         {
-            // updating enPassant Square
+            int fromSquare = move.From;
+            int toSquare = move.To;
+            int fromRow = fromSquare / 8;
+            int toRow = toSquare / 8;
+            int movingPiece = move.MovingPiece;
+
+
             UnmakeMoveInformation safeInfo = new()
             {
-                oldCastlingRights = Castling,
+                oldCastlingRights = CastlingRights,
                 oldEnPassantSquare = EnPassantSquare,
                 oldHalfMoveClock = HalfMoveClock,
                 oldFullMoveClock = FullMoveClock
             };
-            unmakeMoveInformation.Push(safeInfo);
+            unmakeMoveInformationTest[plyCount] = safeInfo;
+            plyCount++;
 
-            UpdateEnPassantSquare(move);
+            // Update EnPassant Square
+            EnPassantSquare = -1;
+            if (Math.Abs(fromRow - toRow) == 2 && Math.Abs(movingPiece) == Piece.WhitePawn)
+            {
+                EnPassantSquare = (fromSquare + toSquare) / 2;
+            }
+
 
             //castling Rights
             UpdateCastleRights(move);
@@ -255,7 +267,7 @@ namespace Chess
             //handle en passant
             if (move.IsEnPassant)
             {
-                int captureSquare = move.To + (ColourToMove == Piece.White ? -8 : 8);
+                int captureSquare = toSquare + (ColourToMove == Piece.White ? -8 : 8);
                 Squares[captureSquare] = Piece.None;
             }
 
@@ -263,19 +275,19 @@ namespace Chess
             if (move.IsCastling)
             {
                 // Kingside or queenside castling
-                if (move.To == move.From + 2)
+                if (toSquare == fromSquare + 2)
                 {
                     // Kingside: move rook
-                    Squares[move.From + 3] = Piece.None;
-                    Squares[move.From + 1] = Piece.IsWhite(move.MovingPiece)
+                    Squares[fromSquare + 3] = Piece.None;
+                    Squares[fromSquare + 1] = Piece.IsWhite(movingPiece)
                         ? Piece.WhiteRook
                         : Piece.BlackRook;
                 }
-                else if (move.To == move.From - 2)
+                else if (toSquare == fromSquare - 2)
                 {
                     // Queenside: move rook
-                    Squares[move.From - 4] = 0;
-                    Squares[move.From - 1] = Piece.IsWhite(move.MovingPiece)
+                    Squares[fromSquare - 4] = 0;
+                    Squares[fromSquare - 1] = Piece.IsWhite(movingPiece)
                         ? Piece.WhiteRook
                         : Piece.BlackRook;
                 }
@@ -283,14 +295,14 @@ namespace Chess
 
             if (move.PromotionPiece != Piece.None)
             {
-                Squares[move.To] = move.PromotionPiece;
+                Squares[toSquare] = move.PromotionPiece;
             }
             else
             {
-                Squares[move.To] = move.MovingPiece;
+                Squares[toSquare] = movingPiece;
             }
 
-            Squares[move.From] = Piece.None;
+            Squares[fromSquare] = Piece.None;
 
             UpdateHalfMoveClock(move);
             UpdateFullMoveClock(move);
@@ -299,52 +311,58 @@ namespace Chess
 
         public void UnmakeMove(Move move)
         {
-            UnmakeMoveInformation savedInfo = unmakeMoveInformation.Pop();
+            int fromSquare = move.From;
+            int toSquare = move.To;
+            int movingPiece = move.MovingPiece;
+            int capturedPiece = move.CapturedPiece;
+
+            plyCount--;
+            UnmakeMoveInformation savedInfo = unmakeMoveInformationTest[plyCount];
             ColourToMove = -ColourToMove;
 
             EnPassantSquare = savedInfo.oldEnPassantSquare;
 
-            Castling = savedInfo.oldCastlingRights;
+            CastlingRights = savedInfo.oldCastlingRights;
             HalfMoveClock = savedInfo.oldHalfMoveClock;
             FullMoveClock = savedInfo.oldFullMoveClock;
 
-            Squares[move.To] = Piece.None;
+            Squares[toSquare] = Piece.None;
 
             if (move.PromotionPiece != Piece.None)
             {
-                Squares[move.From] = move.MovingPiece;
+                Squares[fromSquare] = movingPiece;
             }
             else
             {
-                Squares[move.From] = move.MovingPiece;
+                Squares[fromSquare] = movingPiece;
             }
 
-            if (move.CapturedPiece != Piece.None)
+            if (capturedPiece != Piece.None)
             {
                 if (move.IsEnPassant)
                 {
-                    int captureSquare = move.To + (Piece.IsWhite(move.MovingPiece) ? -8 : 8);
-                    Squares[captureSquare] = move.CapturedPiece;
+                    int captureSquare = toSquare + (Piece.IsWhite(movingPiece) ? -8 : 8);
+                    Squares[captureSquare] = capturedPiece;
                 }
                 else
                 {
-                    Squares[move.To] = move.CapturedPiece;
+                    Squares[toSquare] = capturedPiece;
                 }
             }
 
             // Rückgängig machen von Rochade
             if (move.IsCastling)
             {
-                if (move.To == move.From + 2) // Kingside
+                if (toSquare == fromSquare + 2) // Kingside
                 {
                     // Setze Turm zurück
-                    Squares[move.From + 3] = Piece.IsWhite(move.MovingPiece) ? Piece.WhiteRook : Piece.BlackRook;
-                    Squares[move.From + 1] = Piece.None;
+                    Squares[fromSquare + 3] = Piece.IsWhite(movingPiece) ? Piece.WhiteRook : Piece.BlackRook;
+                    Squares[fromSquare + 1] = Piece.None;
                 }
                 else if (move.To == move.From - 2) // Queenside
                 {
-                    Squares[move.From - 4] = Piece.IsWhite(move.MovingPiece) ? Piece.WhiteRook : Piece.BlackRook;
-                    Squares[move.From - 1] = Piece.None;
+                    Squares[fromSquare - 4] = Piece.IsWhite(movingPiece) ? Piece.WhiteRook : Piece.BlackRook;
+                    Squares[fromSquare - 1] = Piece.None;
                 }
             }
 
@@ -353,43 +371,33 @@ namespace Chess
 
         void UpdateCastleRights(Move move)
         {
-            if (move.MovingPiece == Piece.WhiteKing)
-            {
-                Castling.WhiteKingside = false;
-                Castling.WhiteQueenside = false;
-            }
-            else if (move.MovingPiece == Piece.BlackKing)
-            {
-                Castling.BlackKingside = false;
-                Castling.BlackQueenside = false;
-            }
-            if (move.MovingPiece == Piece.WhiteRook)
-            {
-                if (move.From == 0) Castling.WhiteQueenside = false;
-                if (move.From == 7) Castling.WhiteKingside = false;
-            }
-            else if (move.MovingPiece == Piece.BlackRook)
-            {
-                if (move.From == 56) Castling.BlackQueenside = false;
-                if (move.From == 63) Castling.BlackKingside = false;
-            }
-            if (move.CapturedPiece == Piece.WhiteRook)
-            {
-                if (move.To == 0) Castling.WhiteQueenside = false;
-                else if (move.To == 7) Castling.WhiteKingside = false;
-            }
-            else if (move.CapturedPiece == Piece.BlackRook)
-            {
-                if (move.To == 56) Castling.BlackQueenside = false;
-                else if (move.To == 63) Castling.BlackKingside = false;
-            }
-        }
+            int fromSquare = move.From;
+            int toSquare = move.To;
+            int movingPiece = move.MovingPiece;
+            int capturedPiece = move.CapturedPiece;
 
-        public int GetPieceAt(int index)
-        {
-            if (index < 0 || index >= BoardSize)
-                throw new ArgumentOutOfRangeException(nameof(index));
-            return Squares[index];
+            if (movingPiece == Piece.WhiteKing)
+            {
+                CastlingRights &= ~(WhiteKingsideMask | WhiteQueensideMask);
+            }
+            else if (movingPiece == Piece.BlackKing)
+            {
+                CastlingRights &= ~(BlackKingsideMask | BlackQueensideMask);
+            }
+
+            if ((movingPiece == Piece.WhiteRook && (fromSquare == 0 || fromSquare == 7)) ||
+                (capturedPiece == Piece.WhiteRook && (toSquare == 0 || toSquare == 7)))
+            {
+                if (fromSquare == 0 || toSquare == 0) CastlingRights &= ~WhiteQueensideMask;
+                if (fromSquare == 7 || toSquare == 7) CastlingRights &= ~WhiteKingsideMask;
+            }
+
+            if ((movingPiece == Piece.BlackRook && (fromSquare == 56 || fromSquare == 63)) ||
+                (capturedPiece == Piece.BlackRook && (toSquare == 56 || toSquare == 63)))
+            {
+                if (fromSquare == 56 || toSquare == 56) CastlingRights &= ~BlackQueensideMask;
+                if (fromSquare == 63 || toSquare == 63) CastlingRights &= ~BlackKingsideMask;
+            }
         }
 
         public static int GetIndex(int row, int col) => row * 8 + col;
@@ -400,9 +408,6 @@ namespace Chess
                 throw new ArgumentOutOfRangeException(nameof(index));
             return (index / 8, index % 8);
         }
-
-        public static bool IsWhite(int code) => code > 0;
-        public static bool IsBlack(int code) => code < 0;
 
         private static bool IsValidIndex(int i) => i >= 0 && i < BoardSize;
 
@@ -433,33 +438,13 @@ namespace Chess
         {
             if (color == Piece.White)
             {
-                return (Castling.WhiteQueenside, Castling.WhiteKingside);
+                return ((CastlingRights & WhiteQueensideMask) != 0, (CastlingRights & WhiteKingsideMask) != 0);
             }
             else
             {
-                return (Castling.BlackQueenside, Castling.BlackKingside);
+                return ((CastlingRights & BlackQueensideMask) != 0, (CastlingRights & BlackKingsideMask) != 0);
             }
         }
-
-        public List<Move> GenerateLegalMoves()
-        {
-            List<Move> legalMoves = [];
-
-            var pseudoMoves = moveGenerator.GeneratePseudoLegalMoves(this, ColourToMove);
-
-            for (int i = 0; i < pseudoMoves.Count; i++)
-            {
-                Move move = pseudoMoves[i];
-                MakeMove(move);
-                if (!IsKingInCheck(-ColourToMove))
-                {
-                    legalMoves.Add(move);
-                }
-                UnmakeMove(move);
-            }
-            return legalMoves;
-        }
-
         public bool IsKingInCheck(int color)
         {
             int kingSquare = -1;
@@ -472,8 +457,7 @@ namespace Chess
                     break;
                 }
             }
-            MoveGenerator gen = new();
-            return gen.IsSquareAttacked(kingSquare, -color, this);
+            return moveGenerator.IsSquareAttacked(kingSquare, -color, this);
         }
 
     }

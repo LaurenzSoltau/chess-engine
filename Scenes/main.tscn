@@ -36,6 +36,12 @@ size_flags_horizontal = 3
 theme_override_constants/separation = 12
 alignment = 1
 
+[node name="RichTextLabel" type="RichTextLabel" parent="HBoxContainer/MarginContainer/SideBar"]
+layout_mode = 2
+text = "Time searched:
+Eval:"
+fit_content = true
+
 [node name="PlayAsWhite" parent="HBoxContainer/MarginContainer/SideBar" instance=ExtResource("3_8gbba")]
 layout_mode = 2
 metadata/GameModeCode = 1
@@ -58,5 +64,5 @@ stretch = true
 
 [node name="SubViewport" type="SubViewport" parent="HBoxContainer/SubViewportContainer"]
 handle_input_locally = false
-size = Vector2i(2, 2)
+size = Vector2i(851, 720)
 render_target_update_mode = 4
