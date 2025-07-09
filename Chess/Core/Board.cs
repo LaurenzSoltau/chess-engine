@@ -1,11 +1,8 @@
-using System.Reflection.Metadata.Ecma335;
-
 namespace Chess
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
-    using Godot;
+    using System.Diagnostics;
 
     public class Board
     {
@@ -44,7 +41,7 @@ namespace Chess
 
         public UnmakeMoveInformation[] unmakeMoveInformationTest = new UnmakeMoveInformation[1000];
         public int plyCount;
-         
+
         public int ColourToMove;
 
         readonly MoveGenerator moveGenerator;
@@ -192,7 +189,7 @@ namespace Chess
                 pawns,
                 rooks,
                 knights,
-                bishops    
+                bishops
             ];
         }
 
@@ -237,14 +234,6 @@ namespace Chess
             HalfMoveClock = posInfo.HalfMoveClock;
             FullMoveClock = posInfo.FullMoveClock;
         }
-
-        void UpdateFullMoveClock(Move move)
-        {
-            if (ColourToMove == Piece.Black)
-            {
-                FullMoveClock++;
-            }
-        }
         public void MakeMove(Move move)
         {
             // Store moveInfo for Unmake move
@@ -258,56 +247,80 @@ namespace Chess
             unmakeMoveInformationTest[plyCount] = safeInfo;
             plyCount++;
 
-            
+
             int fromSquare = move.From;
             int toSquare = move.To;
             int fromRow = fromSquare / 8;
             int toRow = toSquare / 8;
 
             int movingPiece = move.MovingPiece;
+            int whitedMovingPiece = Math.Abs(movingPiece);
             int capturedPiece = move.CapturedPiece;
+            int promotionPiece = move.PromotionPiece;
 
             bool isCastling = move.IsCastling;
             bool isEnPassant = move.IsEnPassant;
-            bool captureMove = move.CapturedPiece != Piece.None;
+            bool isCaptureMove = move.CapturedPiece != Piece.None;
+            bool isPromotion = promotionPiece != Piece.None;
+
+            int pieceListColorIndex = ColourToMove == Piece.Black ? 1 : 0;
 
 
-
-            //handle en passant
-                if (move.IsEnPassant)
+            // handle Captures
+            if (isCaptureMove)
+            {
+                int captureSquare = move.To;
+                if (isEnPassant)
                 {
-                    int captureSquare = toSquare + (ColourToMove == Piece.White ? -8 : 8);
+                    captureSquare = toSquare + (ColourToMove == Piece.White ? -8 : 8);
                     Squares[captureSquare] = Piece.None;
                 }
+                GetPieceList(capturedPiece).RemovePiece(captureSquare);
+            }
 
-            // Handle castling
-            if (move.IsCastling)
+            // Handle castling and update Rook in PieceList
+            if (isCastling)
             {
+                int rookPiece = ColourToMove == Piece.White ? Piece.WhiteRook : Piece.BlackRook;
+
                 // Kingside or queenside castling
                 if (toSquare == fromSquare + 2)
                 {
                     // Kingside: move rook
-                    Squares[fromSquare + 3] = Piece.None;
-                    Squares[fromSquare + 1] = Piece.IsWhite(movingPiece)
-                        ? Piece.WhiteRook
-                        : Piece.BlackRook;
+                    int fromSquareRook = fromSquare + 3;
+                    int toSquareRook = fromSquare + 1;
+                    Squares[fromSquareRook] = Piece.None;
+                    Squares[toSquareRook] = rookPiece;
+                    GetPieceList(rookPiece).MovePiece(fromSquareRook, toSquareRook);
                 }
                 else if (toSquare == fromSquare - 2)
                 {
                     // Queenside: move rook
-                    Squares[fromSquare - 4] = 0;
-                    Squares[fromSquare - 1] = Piece.IsWhite(movingPiece)
-                        ? Piece.WhiteRook
-                        : Piece.BlackRook;
+                    int fromSquareRook = fromSquare - 4;
+                    int toSquareRook = fromSquare - 1;
+                    Squares[fromSquareRook] = Piece.None;
+                    Squares[toSquareRook] = rookPiece;
+                    GetPieceList(rookPiece).MovePiece(fromSquareRook, toSquareRook);
                 }
             }
 
-            if (move.PromotionPiece != Piece.None)
+            if (isPromotion)
             {
-                Squares[toSquare] = move.PromotionPiece;
+                Squares[toSquare] = promotionPiece;
+                pawns[pieceListColorIndex].RemovePiece(fromSquare);
+                GetPieceList(promotionPiece).AddPiece(toSquare);
             }
             else
             {
+                if (whitedMovingPiece == Piece.WhiteKing)
+                {
+                    kings[pieceListColorIndex] = toSquare;
+                }
+                else
+                {
+                    GetPieceList(movingPiece).MovePiece(fromSquare, toSquare);
+                }
+
                 Squares[toSquare] = movingPiece;
             }
 
@@ -317,9 +330,9 @@ namespace Chess
             // Update Gamestate
             EnPassantSquare = (Math.Abs(fromRow - toRow) == 2 && Math.Abs(movingPiece) == Piece.WhitePawn) ? (fromSquare + toSquare) / 2 : -1;
             UpdateCastleRights(move);
-            HalfMoveClock = (Math.Abs(movingPiece) == Piece.WhitePawn || capturedPiece != Piece.None) ? 0 : HalfMoveClock++;
-            FullMoveClock = ColourToMove == Piece.Black ? FullMoveClock++ : FullMoveClock; 
-            ColourToMove = ColourToMove == Piece.White ? Piece.Black : Piece.White;
+            HalfMoveClock = (Math.Abs(movingPiece) == Piece.WhitePawn || capturedPiece != Piece.None) ? 0 : HalfMoveClock + 1;
+            FullMoveClock = ColourToMove == Piece.Black ? FullMoveClock + 1 : FullMoveClock;
+            ColourToMove = -ColourToMove;
         }
 
 
@@ -327,61 +340,91 @@ namespace Chess
 
         public void UnmakeMove(Move move)
         {
-            int fromSquare = move.From;
-            int toSquare = move.To;
-            int movingPiece = move.MovingPiece;
-            int capturedPiece = move.CapturedPiece;
-
+            // restore Gamestate
             plyCount--;
             UnmakeMoveInformation savedInfo = unmakeMoveInformationTest[plyCount];
-            ColourToMove = -ColourToMove;
-
             EnPassantSquare = savedInfo.oldEnPassantSquare;
-
             CastlingRights = savedInfo.oldCastlingRights;
             HalfMoveClock = savedInfo.oldHalfMoveClock;
             FullMoveClock = savedInfo.oldFullMoveClock;
+            ColourToMove = -ColourToMove;
 
-            Squares[toSquare] = Piece.None;
 
-            if (move.PromotionPiece != Piece.None)
+            int fromSquare = move.From;
+            int toSquare = move.To;
+            int movingPiece = move.MovingPiece;
+            int whitedMovingPiece = Math.Abs(movingPiece);
+            int capturedPiece = move.CapturedPiece;
+            int promotionPiece = move.PromotionPiece;
+
+            bool isCaptureMove = capturedPiece != Piece.None;
+            bool isCastling = move.IsCastling;
+            bool isEnPassant = move.IsEnPassant;
+            bool isPromotion = promotionPiece != Piece.None;
+
+            int pieceListColorIndex = ColourToMove == Piece.White ? 0 : 1;
+
+            // handle captures and add captured Piece to Piece List
+            if (isCaptureMove)
             {
-                Squares[fromSquare] = movingPiece;
+                int captureSquare = toSquare;
+                if (isEnPassant)
+                {
+                    captureSquare = toSquare + (Piece.IsWhite(movingPiece) ? -8 : 8);
+                    Squares[toSquare] = Piece.None;
+                }
+                GetPieceList(capturedPiece).AddPiece(captureSquare);
+                Squares[captureSquare] = capturedPiece;
             }
             else
             {
-                Squares[fromSquare] = movingPiece;
+                Squares[toSquare] = Piece.None;
             }
 
-            if (capturedPiece != Piece.None)
+            // handle castling and update rookPiecelist
+            if (isCastling)
             {
-                if (move.IsEnPassant)
-                {
-                    int captureSquare = toSquare + (Piece.IsWhite(movingPiece) ? -8 : 8);
-                    Squares[captureSquare] = capturedPiece;
-                }
-                else
-                {
-                    Squares[toSquare] = capturedPiece;
-                }
-            }
+                int rookPiece = ColourToMove == Piece.White ? Piece.WhiteRook : Piece.BlackRook;
 
-            // Rückgängig machen von Rochade
-            if (move.IsCastling)
-            {
                 if (toSquare == fromSquare + 2) // Kingside
                 {
                     // Setze Turm zurück
-                    Squares[fromSquare + 3] = Piece.IsWhite(movingPiece) ? Piece.WhiteRook : Piece.BlackRook;
-                    Squares[fromSquare + 1] = Piece.None;
+                    int fromSquareRook = fromSquare + 3;
+                    int toSquareRook = fromSquare + 1;
+                    Squares[toSquareRook] = Piece.None;
+                    Squares[fromSquareRook] = rookPiece;
+                    rooks[pieceListColorIndex].MovePiece(toSquareRook, fromSquareRook);
                 }
                 else if (move.To == move.From - 2) // Queenside
                 {
-                    Squares[fromSquare - 4] = Piece.IsWhite(movingPiece) ? Piece.WhiteRook : Piece.BlackRook;
-                    Squares[fromSquare - 1] = Piece.None;
+                    int fromSquareRook = fromSquare - 4;
+                    int toSquareRook = fromSquare - 1;
+                    Squares[toSquareRook] = Piece.None;
+                    Squares[fromSquareRook] = rookPiece;
+                    rooks[pieceListColorIndex].MovePiece(toSquareRook, fromSquareRook);
                 }
+                Squares[toSquare] = Piece.None;
             }
 
+            if (isPromotion)
+            {
+                Squares[toSquare] = capturedPiece;
+                GetPieceList(promotionPiece).RemovePiece(toSquare);
+                pawns[pieceListColorIndex].AddPiece(fromSquare);
+            }
+            else
+            {
+                if (whitedMovingPiece == Piece.WhiteKing)
+                {
+                    kings[pieceListColorIndex] = fromSquare;
+                }
+                else
+                {
+                    GetPieceList(movingPiece).MovePiece(toSquare, fromSquare);
+                }
+
+            }
+            Squares[fromSquare] = movingPiece;
         }
 
 
