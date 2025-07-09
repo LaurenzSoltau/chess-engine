@@ -3,6 +3,8 @@ namespace Chess
     using System;
     using System.Collections.Generic;
     using System.Diagnostics;
+    using Godot;
+    using Microsoft.Diagnostics.Tracing.Parsers.Clr;
 
     public class Board
     {
@@ -197,6 +199,9 @@ namespace Chess
         {
             int colorIndex = piece < 0 ? 1 : 0;
             int pieceIndex = Math.Abs(piece) - 2;
+            if (pieceIndex < 0)
+            {
+            }
             return AllPieceLists[pieceIndex][colorIndex];
         }
 
@@ -260,7 +265,7 @@ namespace Chess
 
             bool isCastling = move.IsCastling;
             bool isEnPassant = move.IsEnPassant;
-            bool isCaptureMove = move.CapturedPiece != Piece.None;
+            bool isCaptureMove = capturedPiece != Piece.None;
             bool isPromotion = promotionPiece != Piece.None;
 
             int pieceListColorIndex = ColourToMove == Piece.Black ? 1 : 0;
@@ -408,7 +413,7 @@ namespace Chess
 
             if (isPromotion)
             {
-                Squares[toSquare] = capturedPiece;
+                Squares[toSquare] = isCaptureMove ? capturedPiece : Piece.None;
                 GetPieceList(promotionPiece).RemovePiece(toSquare);
                 pawns[pieceListColorIndex].AddPiece(fromSquare);
             }
@@ -506,17 +511,48 @@ namespace Chess
         }
         public bool IsKingInCheck(int color)
         {
-            int kingSquare = -1;
-            for (int i = 0; i < Squares.Length; i++)
-            {
-                int piece = Squares[i];
-                if (piece == (color == Piece.White ? Piece.WhiteKing : Piece.BlackKing))
-                {
-                    kingSquare = i;
-                    break;
-                }
-            }
+            int kingSquare = color == Piece.White ? kings[0] : kings[1];
             return moveGenerator.IsSquareAttacked(kingSquare, -color, this);
+        }
+
+        void TestPieceListConsistency()
+        {
+            int color = ColourToMove;
+
+            int pawnPiece = color == Piece.White ? Piece.WhitePawn : Piece.BlackPawn;
+            int[] occupiedSquares = GetPieceList(pawnPiece).occupiedSquares;
+            for (int i = 0; i < GetPieceList(pawnPiece).Count; i++)
+            {
+                Debug.Assert(Squares[occupiedSquares[i]] == pawnPiece);
+            }
+
+            int bishopPiece = color == Piece.White ? Piece.WhiteBishop : Piece.BlackBishop;
+            occupiedSquares = GetPieceList(bishopPiece).occupiedSquares;
+            for (int i = 0; i < GetPieceList(bishopPiece).Count; i++)
+            {
+                Debug.Assert(Squares[occupiedSquares[i]] == bishopPiece);
+            }
+
+            int rookPiece = color == Piece.White ? Piece.WhiteRook : Piece.BlackRook;
+            occupiedSquares = GetPieceList(rookPiece).occupiedSquares;
+            for (int i = 0; i < GetPieceList(rookPiece).Count; i++)
+            {
+                Debug.Assert(Squares[occupiedSquares[i]] == rookPiece);
+            }
+
+            int queenPiece = color == Piece.White ? Piece.WhiteQueen : Piece.BlackQueen;
+            occupiedSquares = GetPieceList(queenPiece).occupiedSquares;
+            for (int i = 0; i < GetPieceList(queenPiece).Count; i++)
+            {
+                Debug.Assert(Squares[occupiedSquares[i]] == queenPiece);
+            }
+
+            int knightPiece = color == Piece.White ? Piece.WhiteKnight : Piece.BlackKnight;
+            occupiedSquares = GetPieceList(knightPiece).occupiedSquares;
+            for (int i = 0; i < GetPieceList(knightPiece).Count; i++)
+            {
+                Debug.Assert(Squares[occupiedSquares[i]] == knightPiece);
+            }
         }
 
     }

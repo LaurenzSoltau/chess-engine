@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using Godot;
 
 namespace Chess
 {
@@ -14,6 +16,7 @@ namespace Chess
         readonly int[] blackPromotionPieces = [Piece.BlackQueen, Piece.BlackBishop,
         Piece.BlackKnight, Piece.BlackRook];
         int myColor;
+        int pieceListIndex;
         bool onlyCapturesAndPromotions;
 
         Board board;
@@ -37,7 +40,6 @@ namespace Chess
                     legalMoves.Add(move);
                 }
                 board.UnmakeMove(move);
-
             }
             return legalMoves;
         }
@@ -47,31 +49,44 @@ namespace Chess
             this.board = board;
             this.onlyCapturesAndPromotions = onlyCapturesAndPromotions;
             Init(color);
-            for (int squareIndex = 0; squareIndex < board.Squares.Length; squareIndex++)
+            
+            int pawnPiece = color == Piece.White ? Piece.WhitePawn : Piece.BlackPawn;
+            PieceList pieceList = board.GetPieceList(pawnPiece);
+            for (int i = 0; i < pieceList.Count; i++)
             {
-                int pieceCode = board.Squares[squareIndex];
-                int pieceCodeWhite = Math.Abs(pieceCode);
-                if (!Piece.IsColor(pieceCode, color)) continue;
-
-                if (pieceCodeWhite == Piece.WhiteBishop || pieceCodeWhite == Piece.WhiteRook || pieceCodeWhite == Piece.WhiteQueen)
-                {
-                    GenerateSlidingPieceMoves(squareIndex, pieceCode);
-                }
-
-                if (pieceCodeWhite == Piece.WhitePawn)
-                {
-                    GeneratePawnPieceMoves(squareIndex, pieceCode);
-                }
-
-                if (pieceCodeWhite == Piece.WhiteKnight)
-                {
-                    GenerateKnightPieceMoves(squareIndex, pieceCode);
-                }
-                if (pieceCodeWhite == Piece.WhiteKing && !excludeKingMoves)
-                {
-                    GenerateKingPieceMoves(squareIndex, pieceCode);
-                }
+                GeneratePawnPieceMoves(pieceList.occupiedSquares[i], pawnPiece);
             }
+
+            int bishopPiece = color == Piece.White ? Piece.WhiteBishop : Piece.BlackBishop;
+            pieceList = board.GetPieceList(bishopPiece);
+            for (int i = 0; i < pieceList.Count; i++)
+            {
+                GenerateSlidingPieceMoves(pieceList.occupiedSquares[i], bishopPiece);
+            }
+
+            int rookPiece = color == Piece.White ? Piece.WhiteRook : Piece.BlackRook;
+            pieceList = board.GetPieceList(rookPiece);
+            for (int i = 0; i < pieceList.Count; i++)
+            {
+                GenerateSlidingPieceMoves(pieceList.occupiedSquares[i], rookPiece);
+            }
+
+            int queenPiece = color == Piece.White ? Piece.WhiteQueen : Piece.BlackQueen;
+            pieceList = board.GetPieceList(queenPiece);
+            for (int i = 0; i < pieceList.Count; i++)
+            {
+                GenerateSlidingPieceMoves(pieceList.occupiedSquares[i], queenPiece);
+            }
+
+            int knightPiece = color == Piece.White ? Piece.WhiteKnight : Piece.BlackKnight;
+            pieceList = board.GetPieceList(knightPiece);
+            for (int i = 0; i < pieceList.Count; i++)
+            {
+                GenerateKnightPieceMoves(pieceList.occupiedSquares[i], knightPiece);
+            }
+
+            int kingPiece = color == Piece.White ? Piece.WhiteKing : Piece.BlackKing;
+            GenerateKingPieceMoves(board.kings[pieceListIndex], kingPiece);  
             return moves;
         }
 
@@ -79,6 +94,7 @@ namespace Chess
         {
             moves = new List<Move>(64);
             myColor = color;
+            pieceListIndex = color == Piece.White ? 0 : 1;
         }
 
         void GenerateSlidingPieceMoves(int fromSquare, int pieceCode)
