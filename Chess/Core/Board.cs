@@ -1,10 +1,9 @@
 namespace Chess
 {
     using System;
-    using System.Collections.Generic;
     using System.Diagnostics;
+    using System.Linq;
     using Godot;
-    using Microsoft.Diagnostics.Tracing.Parsers.Clr;
 
     public class Board
     {
@@ -38,7 +37,6 @@ namespace Chess
             public int oldCastlingRights;
             public int oldHalfMoveClock;
             public int oldFullMoveClock;
-
         }
 
         public UnmakeMoveInformation[] unmakeMoveInformationTest = new UnmakeMoveInformation[1000];
@@ -60,119 +58,70 @@ namespace Chess
 
         public bool IsInsufficientMaterial()
         {
-            int whiteBishops = 0;
-            int blackBishops = 0;
-            int whiteKnights = 0;
-            int blackKnights = 0;
-            int whiteRooksOrQueens = 0;
-            int blackRooksOrQueens = 0;
-            int whitePawns = 0;
-            int blackPawns = 0;
+            int whitePawns = GetPieceList(Piece.WhitePawn).Count;
+            int whiteBishops = GetPieceList(Piece.WhiteBishop).Count;
+            int whiteQueens = GetPieceList(Piece.WhiteQueen).Count;
+            int whiteRooks = GetPieceList(Piece.WhiteRook).Count;
+            int whiteKnights = GetPieceList(Piece.WhiteKnight).Count;
+            int whiteAllPieces = whitePawns + whiteBishops + whiteQueens + whiteRooks + whiteKnights;
+            int[] whiteBishopSquares = [.. GetPieceList(Piece.WhiteBishop).occupiedSquares.Take(GetPieceList(Piece.WhiteBishop).Count)];
 
-            List<int> whiteBishopSquares = [];
-            List<int> blackBishopSquares = [];
+            int blackPawns = GetPieceList(Piece.BlackPawn).Count;
+            int blackBishops = GetPieceList(Piece.BlackBishop).Count;
+            int blackQueens = GetPieceList(Piece.BlackQueen).Count;
+            int blackRooks = GetPieceList(Piece.BlackRook).Count;
+            int blackKnights = GetPieceList(Piece.BlackKnight).Count;
+            int[] blackBishopSquares = [.. GetPieceList(Piece.BlackBishop).occupiedSquares.Take(GetPieceList(Piece.BlackBishop).Count)];
+            int blackAllPieces = blackPawns + blackBishops + blackQueens + blackRooks + blackKnights;
 
-            for (int i = 0; i < Squares.Length; i++)
-            {
-                int pieceCode = Squares[i];
-                if (pieceCode == Piece.None) continue;
+            // no draw if there are pawns, queens or rooks
+            int pawnsQueensAndRooks = whitePawns + blackPawns + whiteQueens + blackQueens + whiteRooks + blackRooks;
+            if (pawnsQueensAndRooks > 0) return false;
 
-                int whitePiece = Math.Abs(pieceCode);
+            // draw if king vs. king
+            int allPieces = whiteAllPieces + blackAllPieces;
+            if (allPieces == 0) return true;
 
-                switch (whitePiece)
-                {
-                    case Piece.WhitePawn:
-                        if (Piece.IsWhite(pieceCode)) whitePawns++; else blackPawns++;
-                        break;
+            // draw if Bishop and king vs. king
+            if (whiteBishops == 1 && whiteAllPieces == 1 && blackAllPieces == 0) return true;
+            if (blackBishops == 1 && blackAllPieces == 1 && whiteAllPieces == 0) return true;
 
-                    case Piece.WhiteRook:
+            // draw if knight or two knights and king vs. king
+            if (whiteKnights < 3 && whiteAllPieces == whiteKnights && blackAllPieces == 0) return true;
+            if (blackKnights < 3 && blackAllPieces == blackKnights && whiteAllPieces == 0) return true;
 
-                    case Piece.WhiteQueen:
-                        if (Piece.IsWhite(pieceCode)) whiteRooksOrQueens++; else blackRooksOrQueens++;
-                        break;
+            // draw if bishop and king vs. bishop and king with bishops on the same colour;
+            if (whiteBishops == 1 && blackBishops == 1 && whiteAllPieces == 1 && blackAllPieces == 1 &&
+                BoardRepresentation.IsLightSquare(blackBishopSquares[0]) == BoardRepresentation.IsLightSquare(whiteBishopSquares[0])) return true;
 
-                    case Piece.WhiteBishop:
-                        if (Piece.IsWhite(pieceCode))
-                        {
-                            whiteBishops++;
-                            whiteBishopSquares.Add(i);
-                        }
-                        else
-                        {
-                            blackBishops++;
-                            blackBishopSquares.Add(i);
-                        }
-                        break;
+            // draw if king and multiple bishops of same color vs. king
+            if (whiteBishops > 0 && whiteAllPieces == whiteBishops && blackAllPieces == 0 && AllBishopsOnSameColor(whiteBishopSquares)) return true;
+            if (blackBishops > 0 && blackAllPieces == blackBishops && whiteAllPieces == 0 && AllBishopsOnSameColor(blackBishopSquares)) return true;
 
-                    case Piece.WhiteKnight:
-                        if (Piece.IsWhite(pieceCode)) whiteKnights++; else blackKnights++;
-                        break;
-                }
-            }
+            // draw if bishops and king vs bishops and king and bishops on teh same color
+            if (whiteBishops > 0 && blackBishops > 0 && whiteBishops == whiteAllPieces && blackBishops == blackAllPieces &&
+                AllBishopsOnSameColor(whiteBishopSquares) && AllBishopsOnSameColor(blackBishopSquares)) return true;
 
-            // If any pawns or queens or rooks remain → material sufficient
-            if (whitePawns > 0 || blackPawns > 0 || whiteRooksOrQueens > 0 || blackRooksOrQueens > 0)
-                return false;
-
-            // More than one minor piece per side → sufficient material
-            if (whiteBishops + whiteKnights > 1 || blackBishops + blackKnights > 1)
-                return false;
-
-            // If no minor pieces and no pawns → king vs king
-            if (whiteBishops == 0 && whiteKnights == 0 && blackBishops == 0 && blackKnights == 0)
-                return true;
-
-            // If one side has only one bishop or knight and other side king only → insufficient
-            if ((whiteBishops + whiteKnights == 1 && blackBishops + blackKnights == 0) ||
-                (blackBishops + blackKnights == 1 && whiteBishops + whiteKnights == 0))
-                return true;
-
-            // add different color Bishops logic
-            if (whiteBishops == 1 && blackBishops == 1 &&
-                whiteKnights + blackKnights == 0 &&
-                whiteRooksOrQueens + blackRooksOrQueens == 0 &&
-                whitePawns + blackPawns == 0)
-            {
-                return true;
-
-            }
-
-            if (whiteKnights + blackKnights == 0 &&
-                whiteRooksOrQueens + blackRooksOrQueens == 0 &&
-                whitePawns + blackPawns == 0 &&
-                (whiteBishops + blackBishops > 0))
-            {
-                if (AllBishopsOnSameColor(whiteBishopSquares, blackBishopSquares))
-                    return true; // alle Läufer auf gleicher Farbe → Remis
-            }
-
-            return false; // otherwise sufficient material
+            return false;
         }
 
-        bool AllBishopsOnSameColor(List<int> squaresA, List<int> squaresB)
-        {
-            List<int> allSquares = [.. squaresA, .. squaresB];
 
-            if (allSquares.Count == 0)
+        static bool AllBishopsOnSameColor(int[] bishopSquares)
+        {
+            if (bishopSquares.Length == 0)
                 return false;
 
-            bool firstColor = IsLightSquare(allSquares[0]);
+            bool firstColor = BoardRepresentation.IsLightSquare(bishopSquares[0]);
 
-            foreach (int square in allSquares)
+            foreach (int square in bishopSquares)
             {
-                if (IsLightSquare(square) != firstColor)
+                if (BoardRepresentation.IsLightSquare(square) != firstColor)
                     return false;
             }
 
             return true;
         }
 
-        bool IsLightSquare(int squareIndex)
-        {
-            int rank = squareIndex / 8;
-            int file = squareIndex % 8;
-            return (rank + file) % 2 == 0;
-        }
 
         void Init()
         {
@@ -206,7 +155,7 @@ namespace Chess
         }
 
 
-        public void LoadPosition(String fenString)
+        public void LoadPosition(string fenString)
         {
             PositionInfo posInfo = FenUtil.PositionInfoFromFen(fenString);
             Init();
@@ -464,51 +413,12 @@ namespace Chess
             }
         }
 
-        public static int GetIndex(int row, int col) => row * 8 + col;
-
-        public static (int row, int col) GetCoords(int index)
-        {
-            if (!IsValidIndex(index))
-                throw new ArgumentOutOfRangeException(nameof(index));
-            return (index / 8, index % 8);
-        }
-
-        private static bool IsValidIndex(int i) => i >= 0 && i < BoardSize;
-
-        public static string IndexToSquareName(int index)
-        {
-            int rank = GetCoords(index).row;
-            int file = GetCoords(index).col;
-
-            char rankChar = (char)('1' + rank);
-            char fileChar = (char)('a' + file);
-
-            return fileChar.ToString() + rankChar.ToString();
-
-        }
-        public static int AlgebraicToIndex(string square)
-        {
-            char file = square[0];
-            char rank = square[1];
-
-            int fileNumber = file - 'a';
-            int rankNumber = rank - '1';
-
-            return rankNumber * BoardSize + fileNumber;
-
-        }
-
         public (bool Queenside, bool Kingside) HasColorCastleRight(int color)
         {
-            if (color == Piece.White)
-            {
-                return ((CastlingRights & WhiteQueensideMask) != 0, (CastlingRights & WhiteKingsideMask) != 0);
-            }
-            else
-            {
-                return ((CastlingRights & BlackQueensideMask) != 0, (CastlingRights & BlackKingsideMask) != 0);
-            }
+            if (color == Piece.White) return ((CastlingRights & WhiteQueensideMask) != 0, (CastlingRights & WhiteKingsideMask) != 0);
+            return ((CastlingRights & BlackQueensideMask) != 0, (CastlingRights & BlackKingsideMask) != 0);
         }
+
         public bool IsKingInCheck(int color)
         {
             int kingSquare = color == Piece.White ? kings[0] : kings[1];

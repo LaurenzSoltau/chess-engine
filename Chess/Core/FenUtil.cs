@@ -37,7 +37,7 @@ namespace Chess
                 string currentRowString = rowsInformation[i];
                 //get start square of each row
                 int row = 7 - i;
-                int currentSquareIndex = Chess.Board.GetIndex(row, 0);
+                int currentSquareIndex = BoardRepresentation.IndexFromCoord(row, 0);
                 foreach (char symbol in currentRowString)
                 {
                     // if symbol is number, skip those square
@@ -72,7 +72,7 @@ namespace Chess
             string enPassantString = fenFields[3];
             if (enPassantString != "-")
             {
-                posInfo.EnPassantSquare = Board.AlgebraicToIndex(enPassantString);
+                posInfo.EnPassantSquare = BoardRepresentation.AlgebraicToIndex(enPassantString);
             }
 
             // halfMoveClock
