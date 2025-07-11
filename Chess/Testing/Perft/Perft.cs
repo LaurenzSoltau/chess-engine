@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using Godot;
@@ -133,11 +134,11 @@ namespace Chess.Testing
 
             for (int i = 0; i < pseudoLegalMoves.Count; i++)
             {
-
-                board.MakeMove(pseudoLegalMoves[i]);
+                Move move = pseudoLegalMoves[i];
+                board.MakeMove(move);
                 int numMovesForThisNode = Search(depth - 1);
                 numLocalNodes += numMovesForThisNode;
-                board.UnmakeMove(pseudoLegalMoves[i]);
+                board.UnmakeMove(move);
             }
             return numLocalNodes;
 

@@ -223,7 +223,7 @@ public partial class GameManager : Control
         {
             if (board.IsKingInCheck(-colorToMove))
             {
-                gameState = (colorToMove == Chess.Piece.White) ? GameState.WhiteIsMated : GameState.BlackIsMated;
+                gameState = (colorToMove == Chess.Piece.Black) ? GameState.WhiteIsMated : GameState.BlackIsMated;
             }
             else
             {
@@ -240,10 +240,21 @@ public partial class GameManager : Control
             return;
         }
 
-        if (board.IsInsufficientMaterial()) {
+        if (board.IsInsufficientMaterial())
+        {
             gameState = GameState.InsufficientMaterial;
             OnGameOver();
             return;
+        }
+
+        foreach (KeyValuePair<ulong, int> entry in board.repitionTable)
+        {
+            if (entry.Value > 2)
+            {
+                gameState = GameState.Repition;
+                OnGameOver();
+                return;
+            }
         }
     }
 

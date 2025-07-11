@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using Chess.Testing;
+using Chess;
 
 public partial class TestSuite : Control
 {
@@ -48,6 +49,10 @@ public partial class TestSuite : Control
             if (keyEvent.Keycode == Key.Space)
             {
                 RunTestsAsync();
+            }
+            if (keyEvent.Keycode == Key.Z) 
+            {
+                ZobristTest.TestKeyUpdate();
             }
         }
     }

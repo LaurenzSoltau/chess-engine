@@ -1,9 +1,11 @@
 namespace Chess
 {
     using System;
+    using System.Collections.Generic;
     using System.Diagnostics;
     using System.Linq;
     using Godot;
+    using Microsoft.Win32.SafeHandles;
 
     public class Board
     {
@@ -29,6 +31,8 @@ namespace Chess
         const int BlackKingsideMask = 1 << 2;
         const int BlackQueensideMask = 1 << 3;
         public int CastlingRights;
+        public ulong zobristKey;
+        public Dictionary<ulong, int> repitionTable = [];
 
 
         public struct UnmakeMoveInformation
@@ -142,15 +146,13 @@ namespace Chess
                 knights,
                 bishops
             ];
+            repitionTable.Clear();
         }
 
         public PieceList GetPieceList(int piece)
         {
             int colorIndex = piece < 0 ? 1 : 0;
             int pieceIndex = Math.Abs(piece) - 2;
-            if (pieceIndex < 0)
-            {
-            }
             return AllPieceLists[pieceIndex][colorIndex];
         }
 
@@ -187,8 +189,9 @@ namespace Chess
             if (posInfo.BlackCastleQueenside) CastlingRights |= BlackQueensideMask;
             HalfMoveClock = posInfo.HalfMoveClock;
             FullMoveClock = posInfo.FullMoveClock;
+            zobristKey = Zobrist.GenerateKey(this);
         }
-        public void MakeMove(Move move)
+        public void MakeMove(Move move, bool inSearch = false)
         {
             // Store moveInfo for Unmake move
             UnmakeMoveInformation safeInfo = new()
@@ -210,7 +213,9 @@ namespace Chess
             int movingPiece = move.MovingPiece;
             int whitedMovingPiece = Math.Abs(movingPiece);
             int capturedPiece = move.CapturedPiece;
+            int whitedCapturedPiece = Math.Abs(move.CapturedPiece);
             int promotionPiece = move.PromotionPiece;
+            int whitedPromotionPiece = Math.Abs(promotionPiece);
 
             bool isCastling = move.IsCastling;
             bool isEnPassant = move.IsEnPassant;
@@ -229,33 +234,37 @@ namespace Chess
                     captureSquare = toSquare + (ColourToMove == Piece.White ? -8 : 8);
                     Squares[captureSquare] = Piece.None;
                 }
+                zobristKey ^= Zobrist.pieceSquareNumbers[Math.Abs(pieceListColorIndex - 1), whitedCapturedPiece - 1, captureSquare];
                 GetPieceList(capturedPiece).RemovePiece(captureSquare);
             }
 
             // Handle castling and update Rook in PieceList
             if (isCastling)
             {
+                int fromSquareRook = 0;
+                int toSquareRook = 0;
                 int rookPiece = ColourToMove == Piece.White ? Piece.WhiteRook : Piece.BlackRook;
 
                 // Kingside or queenside castling
                 if (toSquare == fromSquare + 2)
                 {
                     // Kingside: move rook
-                    int fromSquareRook = fromSquare + 3;
-                    int toSquareRook = fromSquare + 1;
+                    fromSquareRook = fromSquare + 3;
+                    toSquareRook = fromSquare + 1;
                     Squares[fromSquareRook] = Piece.None;
                     Squares[toSquareRook] = rookPiece;
-                    GetPieceList(rookPiece).MovePiece(fromSquareRook, toSquareRook);
                 }
                 else if (toSquare == fromSquare - 2)
                 {
                     // Queenside: move rook
-                    int fromSquareRook = fromSquare - 4;
-                    int toSquareRook = fromSquare - 1;
+                    fromSquareRook = fromSquare - 4;
+                    toSquareRook = fromSquare - 1;
                     Squares[fromSquareRook] = Piece.None;
                     Squares[toSquareRook] = rookPiece;
-                    GetPieceList(rookPiece).MovePiece(fromSquareRook, toSquareRook);
                 }
+                GetPieceList(rookPiece).MovePiece(fromSquareRook, toSquareRook);
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, Piece.WhiteRook - 1, fromSquareRook];
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, Piece.WhiteRook - 1, toSquareRook];
             }
 
             if (isPromotion)
@@ -263,6 +272,8 @@ namespace Chess
                 Squares[toSquare] = promotionPiece;
                 pawns[pieceListColorIndex].RemovePiece(fromSquare);
                 GetPieceList(promotionPiece).AddPiece(toSquare);
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedPromotionPiece - 1, toSquare];
+
             }
             else
             {
@@ -276,17 +287,44 @@ namespace Chess
                 }
 
                 Squares[toSquare] = movingPiece;
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, toSquare];
             }
 
+            zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, fromSquare];
             Squares[fromSquare] = Piece.None;
-
 
             // Update Gamestate
             EnPassantSquare = (Math.Abs(fromRow - toRow) == 2 && Math.Abs(movingPiece) == Piece.WhitePawn) ? (fromSquare + toSquare) / 2 : -1;
+            if (safeInfo.oldEnPassantSquare != -1)
+                zobristKey ^= Zobrist.enPassantFileNumbers[safeInfo.oldEnPassantSquare % 8];
+            if (EnPassantSquare != -1)
+                zobristKey ^= Zobrist.enPassantFileNumbers[EnPassantSquare % 8];
+
             UpdateCastleRights(move);
-            HalfMoveClock = (Math.Abs(movingPiece) == Piece.WhitePawn || capturedPiece != Piece.None) ? 0 : HalfMoveClock + 1;
+            if (safeInfo.oldCastlingRights != CastlingRights)
+            {
+                zobristKey ^= Zobrist.castlingRightsNumbers[safeInfo.oldCastlingRights];
+                zobristKey ^= Zobrist.castlingRightsNumbers[CastlingRights];
+            }
+
+            HalfMoveClock++;
             FullMoveClock = ColourToMove == Piece.Black ? FullMoveClock + 1 : FullMoveClock;
             ColourToMove = -ColourToMove;
+            zobristKey ^= Zobrist.blackToMove;
+
+            if (!inSearch)
+            {
+                if (whitedMovingPiece == Piece.WhitePawn || capturedPiece != Piece.None)
+                {
+                    repitionTable.Clear();
+                    HalfMoveClock = 0;
+                }
+                if (repitionTable.TryGetValue(zobristKey, out int value))
+                    repitionTable[zobristKey] = ++value;
+                else
+                    repitionTable[zobristKey] = 1;
+
+            }
         }
 
 
@@ -297,6 +335,19 @@ namespace Chess
             // restore Gamestate
             plyCount--;
             UnmakeMoveInformation savedInfo = unmakeMoveInformationTest[plyCount];
+
+            zobristKey ^= Zobrist.blackToMove;
+            if (EnPassantSquare != -1)
+                zobristKey ^= Zobrist.enPassantFileNumbers[EnPassantSquare % 8];
+            if (savedInfo.oldEnPassantSquare != -1)
+                zobristKey ^= Zobrist.enPassantFileNumbers[savedInfo.oldEnPassantSquare % 8];
+
+            if (savedInfo.oldCastlingRights != CastlingRights)
+            {
+                zobristKey ^= Zobrist.castlingRightsNumbers[CastlingRights];
+                zobristKey ^= Zobrist.castlingRightsNumbers[savedInfo.oldCastlingRights];
+            }
+
             EnPassantSquare = savedInfo.oldEnPassantSquare;
             CastlingRights = savedInfo.oldCastlingRights;
             HalfMoveClock = savedInfo.oldHalfMoveClock;
@@ -309,6 +360,7 @@ namespace Chess
             int movingPiece = move.MovingPiece;
             int whitedMovingPiece = Math.Abs(movingPiece);
             int capturedPiece = move.CapturedPiece;
+            int whitedCapturedPiece = Math.Abs(capturedPiece);
             int promotionPiece = move.PromotionPiece;
 
             bool isCaptureMove = capturedPiece != Piece.None;
@@ -326,8 +378,10 @@ namespace Chess
                 {
                     captureSquare = toSquare + (Piece.IsWhite(movingPiece) ? -8 : 8);
                     Squares[toSquare] = Piece.None;
+                    zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, toSquare];
                 }
                 GetPieceList(capturedPiece).AddPiece(captureSquare);
+                zobristKey ^= Zobrist.pieceSquareNumbers[Math.Abs(pieceListColorIndex - 1), whitedCapturedPiece - 1, captureSquare];
                 Squares[captureSquare] = capturedPiece;
             }
             else
@@ -339,30 +393,32 @@ namespace Chess
             if (isCastling)
             {
                 int rookPiece = ColourToMove == Piece.White ? Piece.WhiteRook : Piece.BlackRook;
-
+                int fromSquareRook = 0;
+                int toSquareRook = 0;
                 if (toSquare == fromSquare + 2) // Kingside
                 {
-                    // Setze Turm zurück
-                    int fromSquareRook = fromSquare + 3;
-                    int toSquareRook = fromSquare + 1;
-                    Squares[toSquareRook] = Piece.None;
-                    Squares[fromSquareRook] = rookPiece;
-                    rooks[pieceListColorIndex].MovePiece(toSquareRook, fromSquareRook);
+                    fromSquareRook = fromSquare + 3;
+                    toSquareRook = fromSquare + 1;
                 }
                 else if (move.To == move.From - 2) // Queenside
                 {
-                    int fromSquareRook = fromSquare - 4;
-                    int toSquareRook = fromSquare - 1;
-                    Squares[toSquareRook] = Piece.None;
-                    Squares[fromSquareRook] = rookPiece;
-                    rooks[pieceListColorIndex].MovePiece(toSquareRook, fromSquareRook);
+                    fromSquareRook = fromSquare - 4;
+                    toSquareRook = fromSquare - 1;
                 }
+
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, Piece.WhiteRook - 1, toSquareRook];
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, Piece.WhiteRook - 1, fromSquareRook];
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, toSquare];
+                Squares[toSquareRook] = Piece.None;
+                Squares[fromSquareRook] = rookPiece;
+                rooks[pieceListColorIndex].MovePiece(toSquareRook, fromSquareRook);
                 Squares[toSquare] = Piece.None;
             }
 
             if (isPromotion)
             {
                 Squares[toSquare] = isCaptureMove ? capturedPiece : Piece.None;
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, Math.Abs(promotionPiece) - 1, toSquare];
                 GetPieceList(promotionPiece).RemovePiece(toSquare);
                 pawns[pieceListColorIndex].AddPiece(fromSquare);
             }
@@ -378,7 +434,15 @@ namespace Chess
                 }
 
             }
+            if (!isEnPassant && !isCastling && promotionPiece == 0)
+                zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, toSquare];
+            zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, fromSquare];
             Squares[fromSquare] = movingPiece;
+
+            if (repitionTable[zobristKey] > 1)
+                repitionTable[zobristKey]--;
+            else
+                repitionTable.Remove(zobristKey);
         }
 
 
@@ -411,6 +475,7 @@ namespace Chess
                 if (fromSquare == 56 || toSquare == 56) CastlingRights &= ~BlackQueensideMask;
                 if (fromSquare == 63 || toSquare == 63) CastlingRights &= ~BlackKingsideMask;
             }
+
         }
 
         public (bool Queenside, bool Kingside) HasColorCastleRight(int color)
