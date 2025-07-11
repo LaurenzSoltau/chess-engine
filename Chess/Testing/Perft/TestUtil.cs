@@ -1,10 +1,5 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net;
-using System.Reflection.Metadata;
-using System.Runtime.InteropServices;
 
 namespace Chess.Testing
 {
@@ -39,8 +34,8 @@ namespace Chess.Testing
 
         public static string GenerateMoveName(Move move)
         {
-            string fromSquare = Board.IndexToSquareName(move.From);
-            string toSquare = Board.IndexToSquareName(move.To);
+            string fromSquare = BoardRepresentation.IndexToAlgebraic(move.From);
+            string toSquare = BoardRepresentation.IndexToAlgebraic(move.To);
             string promotion = "";
             int WhitePromotionPiece = Math.Abs(move.PromotionPiece);
 
