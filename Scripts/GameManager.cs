@@ -268,14 +268,11 @@ public partial class GameManager : Control
             return;
         }
 
-        foreach (KeyValuePair<ulong, int> entry in board.repitionTable)
+        if (board.IsThreefoldRepition())
         {
-            if (entry.Value > 2)
-            {
-                gameState = GameState.Repition;
-                OnGameOver();
-                return;
-            }
+            gameState = GameState.Repition;
+            OnGameOver();
+            return;
         }
     }
 

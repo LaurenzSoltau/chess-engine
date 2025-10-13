@@ -56,11 +56,6 @@ namespace Chess.Bot
         {
             depthSearched = Math.Max(depthSearched, ply);
 
-            if (board.repitionTable.ContainsKey(board.zobristKey))
-            {
-                return 0;
-            }
-
 
             if (depth == 0)
             {

@@ -32,7 +32,8 @@ namespace Chess
         const int BlackQueensideMask = 1 << 3;
         public int CastlingRights;
         public ulong zobristKey;
-        public Dictionary<ulong, int> repitionTable = [];
+        public ulong[] repitionHistoy = new ulong[2048];
+        public int historyLength;
 
 
         public struct UnmakeMoveInformation
@@ -146,7 +147,6 @@ namespace Chess
                 knights,
                 bishops
             ];
-            repitionTable.Clear();
         }
 
         public PieceList GetPieceList(int piece)
@@ -190,7 +190,8 @@ namespace Chess
             HalfMoveClock = posInfo.HalfMoveClock;
             FullMoveClock = posInfo.FullMoveClock;
             zobristKey = Zobrist.GenerateKey(this);
-            repitionTable[zobristKey] = 1;
+            repitionHistoy[0] = zobristKey;
+            historyLength = 1;
         }
         public void MakeMove(Move move, bool inSearch = false)
         {
@@ -313,19 +314,11 @@ namespace Chess
             ColourToMove = -ColourToMove;
             zobristKey ^= Zobrist.blackToMove;
 
-            if (!inSearch)
+            if (whitedMovingPiece == Piece.WhitePawn || capturedPiece != Piece.None)
             {
-                if (whitedMovingPiece == Piece.WhitePawn || capturedPiece != Piece.None)
-                {
-                    repitionTable.Clear();
-                    HalfMoveClock = 0;
-                }
-                if (repitionTable.TryGetValue(zobristKey, out int value))
-                    repitionTable[zobristKey] = ++value;
-                else
-                    repitionTable[zobristKey] = 1;
-
+                HalfMoveClock = 0;
             }
+            repitionHistoy[historyLength++] = zobristKey;
         }
 
 
@@ -440,14 +433,7 @@ namespace Chess
             zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, fromSquare];
             Squares[fromSquare] = movingPiece;
 
-            if (!inSearch)
-            {
-                if (repitionTable[zobristKey] > 1)
-                    repitionTable[zobristKey]--;
-                else
-                    repitionTable.Remove(zobristKey);
-            }
-
+            historyLength--;
         }
 
 
@@ -493,6 +479,23 @@ namespace Chess
         {
             int kingSquare = color == Piece.White ? kings[0] : kings[1];
             return moveGenerator.IsSquareAttacked(kingSquare, -color, this);
+        }
+
+
+        public bool IsThreefoldRepition()
+        {
+            int start = Math.Max(0, historyLength - HalfMoveClock - 1);
+            int count = 0;
+
+            for (int i = start; i < historyLength; i++)
+            {
+                if (repitionHistoy[i] == zobristKey)
+                {
+                    count++;
+                }
+            }
+            if (count > 2) return true;
+            return false;
         }
 
         void TestPieceListConsistency()
