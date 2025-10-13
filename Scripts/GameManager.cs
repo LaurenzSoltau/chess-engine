@@ -96,9 +96,9 @@ public partial class GameManager : Control
         {
             board.MakeMove(legalMove);
             boardUi.UpdatePosition();
-            UpdateGameState();
-            SwitchTurn();
             boardUi.OnMoveAccepted(legalMove);
+            SwitchTurn();
+            UpdateGameState();
         }
         else
         {
@@ -177,7 +177,7 @@ public partial class GameManager : Control
         board.LoadPosition(PositionFen);
         ai = new Searcher(board);
         boardUi.SetBoard(board);
-        boardUi.SetPerspective(blackPlayerType == PlayerType.Human ? Chess.Piece.Black : Chess.Piece.White);
+        boardUi.SetPerspective(whitePlayerType == PlayerType.Human ? Chess.Piece.White : Chess.Piece.Black);
 
         gameState = GameState.Playing;
         PerformTurn();
@@ -195,10 +195,14 @@ public partial class GameManager : Control
             whitePlayerType = PlayerType.Bot;
             blackPlayerType = PlayerType.Human;
         }
-        else
+        else if (playModeCode == 3)
         {
             whitePlayerType = PlayerType.Bot;
             blackPlayerType = PlayerType.Bot;
+        } else if (playModeCode == 4)
+        {
+            whitePlayerType = PlayerType.Human;
+            blackPlayerType = PlayerType.Human;
         }
     }
 

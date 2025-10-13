@@ -236,8 +236,6 @@ namespace Chess
                     Squares[captureSquare] = Piece.None;
                 }
                 zobristKey ^= Zobrist.pieceSquareNumbers[Math.Abs(pieceListColorIndex - 1), whitedCapturedPiece - 1, captureSquare];
-                //debugging
-                if (Math.Abs(capturedPiece) == 1) return;
                 GetPieceList(capturedPiece).RemovePiece(captureSquare);
             }
 

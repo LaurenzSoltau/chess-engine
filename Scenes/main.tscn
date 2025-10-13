@@ -46,6 +46,11 @@ text = "Time searched:
 Eval:"
 fit_content = true
 
+[node name="PlayAsWhite2" parent="HBoxContainer/MarginContainer/SideBar" groups=["StartGameButton"] instance=ExtResource("3_8gbba")]
+layout_mode = 2
+text = "Human vs Human"
+metadata/GameModeCode = 4
+
 [node name="PlayAsWhite" parent="HBoxContainer/MarginContainer/SideBar" groups=["StartGameButton"] instance=ExtResource("3_8gbba")]
 layout_mode = 2
 metadata/GameModeCode = 1
