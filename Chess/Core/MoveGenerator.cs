@@ -34,12 +34,12 @@ namespace Chess
             for (int i = 0; i < pseudoLegalMoves.Count; i++)
             {
                 Move move = pseudoLegalMoves[i];
-                board.MakeMove(move);
+                board.MakeMove(move, true);
                 if (!board.IsKingInCheck(-board.ColourToMove))
                 {
                     legalMoves.Add(move);
                 }
-                board.UnmakeMove(move);
+                board.UnmakeMove(move, true);
             }
             return legalMoves;
         }

@@ -19,3 +19,4 @@ size_flags_vertical = 4
 theme = ExtResource("1_vbkod")
 text = "Play with White"
 metadata/GameModeCode = 0
+metadata/isFenButton = false

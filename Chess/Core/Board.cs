@@ -190,6 +190,7 @@ namespace Chess
             HalfMoveClock = posInfo.HalfMoveClock;
             FullMoveClock = posInfo.FullMoveClock;
             zobristKey = Zobrist.GenerateKey(this);
+            repitionTable[zobristKey] = 1;
         }
         public void MakeMove(Move move, bool inSearch = false)
         {
@@ -235,6 +236,8 @@ namespace Chess
                     Squares[captureSquare] = Piece.None;
                 }
                 zobristKey ^= Zobrist.pieceSquareNumbers[Math.Abs(pieceListColorIndex - 1), whitedCapturedPiece - 1, captureSquare];
+                //debugging
+                if (Math.Abs(capturedPiece) == 1) return;
                 GetPieceList(capturedPiece).RemovePiece(captureSquare);
             }
 
@@ -330,7 +333,7 @@ namespace Chess
 
 
 
-        public void UnmakeMove(Move move)
+        public void UnmakeMove(Move move, bool inSearch = false)
         {
             // restore Gamestate
             plyCount--;
@@ -439,10 +442,14 @@ namespace Chess
             zobristKey ^= Zobrist.pieceSquareNumbers[pieceListColorIndex, whitedMovingPiece - 1, fromSquare];
             Squares[fromSquare] = movingPiece;
 
-            if (repitionTable[zobristKey] > 1)
-                repitionTable[zobristKey]--;
-            else
-                repitionTable.Remove(zobristKey);
+            if (!inSearch)
+            {
+                if (repitionTable[zobristKey] > 1)
+                    repitionTable[zobristKey]--;
+                else
+                    repitionTable.Remove(zobristKey);
+            }
+
         }
 
 
@@ -529,6 +536,5 @@ namespace Chess
                 Debug.Assert(Squares[occupiedSquares[i]] == knightPiece);
             }
         }
-
     }
 }

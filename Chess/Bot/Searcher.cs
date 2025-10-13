@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Godot;
 
@@ -37,9 +38,9 @@ namespace Chess.Bot
             sw.Start();
             foreach (Move move in legalMoves)
             {
-                board.MakeMove(move);
-                int eval = -Search(negativeInfinity, positiveInfinity, depth - 1);
-                board.UnmakeMove(move);
+                board.MakeMove(move, true);
+                int eval = -Search(negativeInfinity, positiveInfinity, depth - 1, 1);
+                board.UnmakeMove(move, true);
 
                 if (eval > bestEval)
                 {
@@ -51,11 +52,19 @@ namespace Chess.Bot
             botDiagnostics = new((int)sw.ElapsedMilliseconds, bestEval, depthSearched);
         }
 
-        int Search(int alpha, int beta, int depth)
+        int Search(int alpha, int beta, int depth, int ply)
         {
+            depthSearched = Math.Max(depthSearched, ply);
+
+            if (board.repitionTable.ContainsKey(board.zobristKey))
+            {
+                return 0;
+            }
+
+
             if (depth == 0)
             {
-                return Quiesence(alpha, beta, 5);
+                return Quiesence(alpha, beta, 8, ply + 1);
             }
             var legalMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove);
 
@@ -67,9 +76,9 @@ namespace Chess.Bot
             int bestEval = -9999999;
             foreach (Move move in legalMoves)
             {
-                board.MakeMove(move);
-                int eval = -Search(-beta, -alpha, depth - 1);
-                board.UnmakeMove(move);
+                board.MakeMove(move, true);
+                int eval = -Search(-beta, -alpha, depth - 1, ply + 1);
+                board.UnmakeMove(move, true);
 
                 bestEval = Math.Max(eval, bestEval);
                 alpha = Math.Max(alpha, eval);
@@ -79,9 +88,10 @@ namespace Chess.Bot
             return bestEval;
         }
 
-        int Quiesence(int alpha, int beta, int qDepth)
+        int Quiesence(int alpha, int beta, int qDepth, int ply)
         {
-            depthSearched++;
+            depthSearched = Math.Max(depthSearched, ply);
+
             if (qDepth == 0)
             {
                 return evaluation.Evaluate(board);
@@ -100,12 +110,13 @@ namespace Chess.Bot
             }
 
             var captureMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove, true);
+            if (captureMoves.Count == 0) return alpha;
 
             foreach (var move in captureMoves)
             {
-                board.MakeMove(move);
-                int score = -Quiesence(-beta, -alpha, qDepth - 1);
-                board.UnmakeMove(move);
+                board.MakeMove(move, true);
+                int score = -Quiesence(-beta, -alpha, qDepth - 1, ply + 1);
+                board.UnmakeMove(move, true);
 
                 if (score >= beta) return beta;
 

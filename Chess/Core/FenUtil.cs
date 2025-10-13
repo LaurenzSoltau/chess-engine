@@ -20,8 +20,14 @@ namespace Chess
         {'b', Piece.BlackBishop},
         {'q', Piece.BlackQueen},
         {'k', Piece.BlackKing}
-    };
+        };
+
         public const string StartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+        public static string getColorToMove(string fenString)
+        {
+            return fenString.Split(' ')[1];
+        }
 
         //need to add Errorhandling
         public static PositionInfo PositionInfoFromFen(string fenString)

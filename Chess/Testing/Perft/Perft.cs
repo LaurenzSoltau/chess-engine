@@ -107,9 +107,9 @@ namespace Chess.Testing
 
             foreach (var move in moves)
             {
-                board.MakeMove(move);
+                board.MakeMove(move, true);
                 int count = SearchDivide(startDepth, currentDepth - 1);
-                board.UnmakeMove(move);
+                board.UnmakeMove(move, true);
 
                 numLocalNodes += count;
 
@@ -135,10 +135,10 @@ namespace Chess.Testing
             for (int i = 0; i < pseudoLegalMoves.Count; i++)
             {
                 Move move = pseudoLegalMoves[i];
-                board.MakeMove(move);
+                board.MakeMove(move, true);
                 int numMovesForThisNode = Search(depth - 1);
                 numLocalNodes += numMovesForThisNode;
-                board.UnmakeMove(move);
+                board.UnmakeMove(move, true);
             }
             return numLocalNodes;
 

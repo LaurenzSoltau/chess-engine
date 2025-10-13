@@ -1,10 +1,11 @@
-[gd_scene load_steps=4 format=3 uid="uid://dqhigechc8lvm"]
+[gd_scene load_steps=5 format=3 uid="uid://dqhigechc8lvm"]
 
 [ext_resource type="Script" uid="uid://brpasdnlq8ng5" path="res://Scripts/GameManager.cs" id="1_jjgbg"]
 [ext_resource type="PackedScene" uid="uid://2wqwmyeorl0h" path="res://Scenes/boardui.tscn" id="2_bo1nx"]
 [ext_resource type="PackedScene" uid="uid://cvufglvmxajc" path="res://Scenes/start_game_button.tscn" id="3_8gbba"]
+[ext_resource type="Theme" uid="uid://bf85kk3bb1f1n" path="res://Assets/default.tres" id="4_jjvhh"]
 
-[node name="Main" type="Control" node_paths=PackedStringArray("SubViewport")]
+[node name="Main" type="Control" node_paths=PackedStringArray("SubViewport", "fenLine", "evalPosButton", "evalPosLabel")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -14,6 +15,9 @@ grow_vertical = 2
 script = ExtResource("1_jjgbg")
 boardUIPackedScene = ExtResource("2_bo1nx")
 SubViewport = NodePath("HBoxContainer/SubViewportContainer/SubViewport")
+fenLine = NodePath("HBoxContainer/MarginContainer/SideBar/LineEdit")
+evalPosButton = NodePath("HBoxContainer/MarginContainer/SideBar/Evaluate")
+evalPosLabel = NodePath("HBoxContainer/MarginContainer/SideBar/PosEval")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="."]
 layout_mode = 1
@@ -42,19 +46,33 @@ text = "Time searched:
 Eval:"
 fit_content = true
 
-[node name="PlayAsWhite" parent="HBoxContainer/MarginContainer/SideBar" instance=ExtResource("3_8gbba")]
+[node name="PlayAsWhite" parent="HBoxContainer/MarginContainer/SideBar" groups=["StartGameButton"] instance=ExtResource("3_8gbba")]
 layout_mode = 2
 metadata/GameModeCode = 1
 
-[node name="PlayAsBlack" parent="HBoxContainer/MarginContainer/SideBar" instance=ExtResource("3_8gbba")]
+[node name="PlayAsBlack" parent="HBoxContainer/MarginContainer/SideBar" groups=["StartGameButton"] instance=ExtResource("3_8gbba")]
 layout_mode = 2
 text = "Play with Black"
 metadata/GameModeCode = 2
 
-[node name="AiVsAi" parent="HBoxContainer/MarginContainer/SideBar" instance=ExtResource("3_8gbba")]
+[node name="AiVsAi" parent="HBoxContainer/MarginContainer/SideBar" groups=["StartGameButton"] instance=ExtResource("3_8gbba")]
 layout_mode = 2
 text = "Ai vs Ai"
 metadata/GameModeCode = 3
+
+[node name="LineEdit" type="LineEdit" parent="HBoxContainer/MarginContainer/SideBar"]
+layout_mode = 2
+placeholder_text = "Fen String Here"
+
+[node name="Evaluate" type="Button" parent="HBoxContainer/MarginContainer/SideBar"]
+layout_mode = 2
+theme = ExtResource("4_jjvhh")
+text = "Evaluate Position"
+
+[node name="PosEval" type="RichTextLabel" parent="HBoxContainer/MarginContainer/SideBar"]
+layout_mode = 2
+text = "Pos eval:"
+fit_content = true
 
 [node name="SubViewportContainer" type="SubViewportContainer" parent="HBoxContainer"]
 layout_mode = 2

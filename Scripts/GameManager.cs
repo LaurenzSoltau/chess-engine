@@ -3,8 +3,6 @@ using Chess.Bot;
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Threading.Tasks;
 
 public partial class GameManager : Control
@@ -13,6 +11,12 @@ public partial class GameManager : Control
     PackedScene boardUIPackedScene;
     [Export]
     SubViewport SubViewport;
+    [Export]
+    public LineEdit fenLine;
+    [Export]
+    Button evalPosButton;
+    [Export]
+    RichTextLabel evalPosLabel;
     VBoxContainer sideBar;
     RichTextLabel searchDiagnosticsLabel;
 
@@ -46,11 +50,15 @@ public partial class GameManager : Control
         searchDiagnosticsLabel = GetNode<RichTextLabel>("HBoxContainer/MarginContainer/SideBar/RichTextLabel");
         SubViewport.AddChild(boardUi);
         boardUi.AttempMakeMove += OnMoveAttempted;
+        evalPosButton.Pressed += () => HandleEvaluateButtonPressed(evalPosButton);
         foreach (Node child in GetNode<VBoxContainer>("HBoxContainer/MarginContainer/SideBar").GetChildren())
         {
-            if (child is Button startGameButton)
+            if (child.IsInGroup("StartGameButton"))
             {
-                startGameButton.Pressed += () => HandleStartButtonPressed(startGameButton);
+                if (child is Button startGameButton)
+                {
+                    startGameButton.Pressed += () => HandleStartButtonPressed(startGameButton);
+                }
             }
         }
 
@@ -62,16 +70,6 @@ public partial class GameManager : Control
         NewGame();
     }
 
-
-
-    public override void _Process(double delta)
-    {
-        HandleInput();
-    }
-
-    void HandleInput()
-    {
-    }
 
     private void OnMoveAttempted(int fromIndex, int toIndex)
     {
@@ -151,11 +149,30 @@ public partial class GameManager : Control
         NewGame();
     }
 
+
+    void HandleEvaluateButtonPressed(Button button)
+    {
+        Evaluation evaluation = new();
+        int score = evaluation.Evaluate(board);
+        evalPosLabel.Text = "Pos eval: " + score;
+    }
+
     void NewGame()
     {
         gameId++;
-        colorToMove = Chess.Piece.White;
-        playerToMove = whitePlayerType;
+        // load position from fen string if present, else load starting position
+        if (fenLine.Text == "")
+        {
+            PositionFen = FenUtil.StartFen;
+        }
+        else
+        {
+            PositionFen = fenLine.Text;
+        }
+
+        string colorToMoveString = FenUtil.getColorToMove(PositionFen);
+        colorToMove = colorToMoveString == "w" ? Chess.Piece.White : Chess.Piece.Black;
+        playerToMove = colorToMoveString == "w" ? whitePlayerType : blackPlayerType;
         board = new();
         board.LoadPosition(PositionFen);
         ai = new Searcher(board);
@@ -197,7 +214,7 @@ public partial class GameManager : Control
         Move move = ai.bestMove;
         if (!move.isValid)
         {
-            GD.Print("test");
+            GD.Print("Invalid move from search");
             UpdateGameState();
             return;
         }
