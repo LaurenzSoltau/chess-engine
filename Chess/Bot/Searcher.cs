@@ -16,6 +16,7 @@ namespace Chess.Bot
         public Move bestMove;
         public BotDiagnostics botDiagnostics;
         int depthSearched;
+        MoveOrdering moveOrdering;
 
         readonly Board board;
         readonly Evaluation evaluation;
@@ -26,29 +27,45 @@ namespace Chess.Bot
             this.board = board;
             moveGenerator = new();
             evaluation = new Evaluation();
+            moveOrdering = new();
         }
 
-        public void StartSearch(int depth)
+        public void StartSearch(int maxDepth)
         {
             depthSearched = 0;
-            var legalMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove);
             var bestEval = negativeInfinity;
             bestMove = new();
+
             var sw = new Stopwatch();
             sw.Start();
-            foreach (Move move in legalMoves)
-            {
-                board.MakeMove(move, true);
-                int eval = -Search(negativeInfinity, positiveInfinity, depth - 1, 1);
-                board.UnmakeMove(move, true);
 
-                if (eval > bestEval)
+            for (int searchDepth = 1; searchDepth <= maxDepth; searchDepth++)
+            {
+                int currentBestEval = negativeInfinity;
+                Move currentBestMove = new();
+
+                var legalMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove);
+                moveOrdering.OrderMoves(legalMoves, board);
+
+                foreach (Move move in legalMoves)
                 {
-                    bestEval = eval;
-                    bestMove = move;
+                    board.MakeMove(move, true);
+                    int eval = -Search(negativeInfinity, positiveInfinity, searchDepth - 1, 1);
+                    board.UnmakeMove(move, true);
+
+                    if (eval > currentBestEval)
+                    {
+                        currentBestEval = eval;
+                        currentBestMove = move;
+                    }
                 }
+
+                bestEval = currentBestEval;
+                bestMove = currentBestMove;
             }
+
             sw.Stop();
+
             botDiagnostics = new((int)sw.ElapsedMilliseconds, bestEval, depthSearched);
         }
 
@@ -59,9 +76,10 @@ namespace Chess.Bot
 
             if (depth == 0)
             {
-                return Quiesence(alpha, beta, 8, ply + 1);
+                return Quiesence(alpha, beta, 100, ply + 1);
             }
             var legalMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove);
+            moveOrdering.OrderMoves(legalMoves, board);
 
             if (legalMoves.Count == 0)
             {
@@ -105,6 +123,8 @@ namespace Chess.Bot
             }
 
             var captureMoves = moveGenerator.GenerateLegalMoves(board, board.ColourToMove, true);
+            moveOrdering.OrderMoves(captureMoves, board);
+
             if (captureMoves.Count == 0) return alpha;
 
             foreach (var move in captureMoves)

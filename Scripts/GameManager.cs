@@ -116,6 +116,9 @@ public partial class GameManager : Control
         if (GetPlayerType(colorToMove) == PlayerType.Bot)
         {
             MakeAiMove();
+        } else
+        {
+            EmitSignal(SignalName.HumanTurn);
         }
     }
 
@@ -214,7 +217,7 @@ public partial class GameManager : Control
         {
             return;
         }
-        ai.StartSearch(4);
+        ai.StartSearch(5);
         Move move = ai.bestMove;
         if (!move.isValid)
         {
@@ -289,9 +292,7 @@ public partial class GameManager : Control
         _ => "Unbekannter Spielzustand.",
     };
     GD.Print("Game Over: " + message);
-
-    // Optional: UI anzeigen
-    // Spielinteraktion stoppen
+    boardUi.blockInputState();
 }
 
 }

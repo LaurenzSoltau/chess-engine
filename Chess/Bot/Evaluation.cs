@@ -6,11 +6,11 @@ namespace Chess.Bot
 {
     public class Evaluation
     {
-        const int pawnValue = 100;
-        const int knightValue = 320;
-        const int bishopValue = 330;
-        const int rookValue = 500;
-        const int queenValue = 900;
+        public const int pawnValue = 100;
+        public const int knightValue = 320;
+        public const int bishopValue = 330;
+        public const int rookValue = 500;
+        public const int queenValue = 900;
 
         const int knightWeight = 1; const int bishopWeight = 1;
         const int rookWeight = 2;

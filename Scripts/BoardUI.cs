@@ -304,6 +304,11 @@ public partial class BoardUI : Node2D
         UpdatePosition();
     }
 
+    public void blockInputState()
+    {
+        currentState = InputState.Blocked;
+    }
+
     public void UpdatePosition()
     {
 

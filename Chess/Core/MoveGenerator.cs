@@ -34,6 +34,8 @@ namespace Chess
             for (int i = 0; i < pseudoLegalMoves.Count; i++)
             {
                 Move move = pseudoLegalMoves[i];
+                if (Math.Abs(move.CapturedPiece) == 1) continue;
+
                 board.MakeMove(move, true);
                 if (!board.IsKingInCheck(-board.ColourToMove))
                 {
