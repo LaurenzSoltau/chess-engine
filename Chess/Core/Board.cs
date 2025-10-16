@@ -498,6 +498,17 @@ namespace Chess
             return false;
         }
 
+        public bool IsRepition()
+        {
+            int start = Math.Max(0, historyLength - HalfMoveClock - 1);
+            for (int i = start; i < historyLength - 1; i++)
+            {
+                if (repitionHistoy[i] == zobristKey)
+                    return true;
+            }
+            return false;
+        }
+
         void TestPieceListConsistency()
         {
             int color = ColourToMove;

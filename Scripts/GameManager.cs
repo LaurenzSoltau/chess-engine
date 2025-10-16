@@ -217,7 +217,7 @@ public partial class GameManager : Control
         {
             return;
         }
-        ai.StartSearch(5);
+        ai.StartSearch(6);
         Move move = ai.bestMove;
         if (!move.isValid)
         {

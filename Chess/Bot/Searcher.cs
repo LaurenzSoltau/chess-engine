@@ -73,6 +73,10 @@ namespace Chess.Bot
         {
             depthSearched = Math.Max(depthSearched, ply);
 
+            if (board.IsRepition())
+            {
+                return 0;
+            }
 
             if (depth == 0)
             {
@@ -104,6 +108,11 @@ namespace Chess.Bot
         int Quiesence(int alpha, int beta, int qDepth, int ply)
         {
             depthSearched = Math.Max(depthSearched, ply);
+
+            if (board.IsRepition())
+            {
+                return 0;
+            }
 
             if (qDepth == 0)
             {
@@ -140,4 +149,5 @@ namespace Chess.Bot
             return alpha;
         }
     }
+
 }
