@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://cvufglvmxajc" path="res://Scenes/start_game_button.tscn" id="3_8gbba"]
 [ext_resource type="Theme" uid="uid://bf85kk3bb1f1n" path="res://Assets/default.tres" id="4_jjvhh"]
 
-[node name="Main" type="Control" node_paths=PackedStringArray("SubViewport", "fenLine", "evalPosButton", "evalPosLabel")]
+[node name="Main" type="Control" node_paths=PackedStringArray("SubViewport", "fenLine", "evalPosButton", "evalPosLabel", "GetFenButton")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -18,6 +18,7 @@ SubViewport = NodePath("HBoxContainer/SubViewportContainer/SubViewport")
 fenLine = NodePath("HBoxContainer/MarginContainer/SideBar/LineEdit")
 evalPosButton = NodePath("HBoxContainer/MarginContainer/SideBar/Evaluate")
 evalPosLabel = NodePath("HBoxContainer/MarginContainer/SideBar/PosEval")
+GetFenButton = NodePath("HBoxContainer/MarginContainer/SideBar/GetFen")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="."]
 layout_mode = 1
@@ -73,6 +74,11 @@ placeholder_text = "Fen String Here"
 layout_mode = 2
 theme = ExtResource("4_jjvhh")
 text = "Evaluate Position"
+
+[node name="GetFen" type="Button" parent="HBoxContainer/MarginContainer/SideBar"]
+layout_mode = 2
+theme = ExtResource("4_jjvhh")
+text = "Get Fen"
 
 [node name="PosEval" type="RichTextLabel" parent="HBoxContainer/MarginContainer/SideBar"]
 layout_mode = 2

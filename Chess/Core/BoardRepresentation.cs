@@ -63,5 +63,21 @@ namespace Chess
             int file = squareIndex % 8;
             return (rank + file) % 2 == 0;
         }
+
+        public static PositionInfo BoardToPositionInfo(Board board)
+        {
+            PositionInfo posInfo = new();
+            board.Squares.CopyTo(posInfo.Squares, 0);
+            posInfo.EnPassantSquare = board.EnPassantSquare;
+            (bool, bool) whiteCastleRights = board.HasColorCastleRight(Piece.White);
+            (bool, bool) blackCastleRights = board.HasColorCastleRight(Piece.Black);
+            posInfo.WhiteCastleKingside = whiteCastleRights.Item1;
+            posInfo.WhiteCastleQueenside = whiteCastleRights.Item2;
+            posInfo.BlackCastleKingside = blackCastleRights.Item1;
+            posInfo.BlackCastleQueenside = blackCastleRights.Item2;
+            posInfo.HalfMoveClock = board.HalfMoveClock;
+            posInfo.FullMoveClock = board.FullMoveClock;
+            return posInfo;
+        }
     }
 }

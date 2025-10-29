@@ -97,6 +97,46 @@ namespace Chess
 
             return posInfo;
         }
+
+        public static string FenFromPositionInfo(PositionInfo posInfo)
+        {
+            string fen = "";
+            // encode pieces
+            for (int i = 0; i < posInfo.Squares.Length; i++)
+            {
+                if ((i + 1) % 8 == 0 && i != 63)
+                {
+                    fen += "/";
+                }
+                fen += BoardRepresentation.IndexToAlgebraic(i);
+            }
+            //encoce side to move
+            fen += " " + (posInfo.WhiteToMove ? "w" : "b");
+
+            //encode castle rights
+            string castleRights = "";
+            castleRights += posInfo.WhiteCastleKingside ? "K" : "";
+            castleRights += posInfo.WhiteCastleQueenside ? "Q" : "";
+            castleRights += posInfo.BlackCastleKingside ? "k" : "";
+            castleRights += posInfo.BlackCastleQueenside ? "q" : "";
+            // if no castle rights -
+            if (castleRights == "")
+            {
+                castleRights = "-";
+            }
+            fen += " " + castleRights;
+
+            //encode En Passant
+            int enPassantSquare = posInfo.EnPassantSquare;
+            string enPassantString = enPassantSquare == -1 ? "-" : BoardRepresentation.IndexToAlgebraic(enPassantSquare);
+            fen += " " + enPassantString;
+
+            // encode halfMoveclock and fullMoveClock
+            fen += " " + posInfo.HalfMoveClock;
+            fen += " " + posInfo.FullMoveClock;
+
+            return fen;
+        }
     }
 
 }

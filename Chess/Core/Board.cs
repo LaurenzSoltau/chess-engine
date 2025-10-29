@@ -509,7 +509,7 @@ namespace Chess
             return false;
         }
 
-        void TestPieceListConsistency()
+        public void TestPieceListConsistency()
         {
             int color = ColourToMove;
 

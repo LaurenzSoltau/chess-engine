@@ -17,6 +17,8 @@ public partial class GameManager : Control
     Button evalPosButton;
     [Export]
     RichTextLabel evalPosLabel;
+    [Export]
+    Button GetFenButton;
     VBoxContainer sideBar;
     RichTextLabel searchDiagnosticsLabel;
 
@@ -51,6 +53,7 @@ public partial class GameManager : Control
         SubViewport.AddChild(boardUi);
         boardUi.AttempMakeMove += OnMoveAttempted;
         evalPosButton.Pressed += () => HandleEvaluateButtonPressed(evalPosButton);
+        GetFenButton.Pressed += () => HandleGetFenButtonPressed(GetFenButton);
         foreach (Node child in GetNode<VBoxContainer>("HBoxContainer/MarginContainer/SideBar").GetChildren())
         {
             if (child.IsInGroup("StartGameButton"))
@@ -68,6 +71,14 @@ public partial class GameManager : Control
         gameId = 0;
         SetPlayers(1);
         NewGame();
+    }
+
+    private void HandleGetFenButtonPressed(Button button)
+    {
+        if (board == null) return;
+        PositionInfo posInfo = BoardRepresentation.BoardToPositionInfo(board);
+        string fen = FenUtil.FenFromPositionInfo(posInfo);
+        fenLine.Text = fen;
     }
 
 
@@ -95,6 +106,7 @@ public partial class GameManager : Control
         if (isLegal)
         {
             board.MakeMove(legalMove);
+            board.TestPieceListConsistency();
             boardUi.UpdatePosition();
             boardUi.OnMoveAccepted(legalMove);
             SwitchTurn();
