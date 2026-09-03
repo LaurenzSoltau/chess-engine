@@ -1,5 +1,3 @@
-using Godot;
-
 namespace Chess
 {
     public class PieceList
@@ -44,16 +42,6 @@ namespace Chess
             occupiedSquares[pieceIndex] = to;
             map[to] = pieceIndex;
         }
-
-        public void Print()
-        {
-            GD.Print(occupiedSquares);
-            GD.Print(numPieces);
-        }
-
-
-
-
     }
 
 

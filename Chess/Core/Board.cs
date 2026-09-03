@@ -5,7 +5,6 @@ namespace Chess
     using System.Diagnostics;
     using System.Linq;
     using Godot;
-    using Microsoft.Win32.SafeHandles;
 
     public class Board
     {
@@ -32,7 +31,7 @@ namespace Chess
         const int BlackQueensideMask = 1 << 3;
         public int CastlingRights;
         public ulong zobristKey;
-        public ulong[] repitionHistoy = new ulong[2048];
+        public ulong[] repetitionHistory = new ulong[2048];
         public int historyLength;
 
 
@@ -190,7 +189,7 @@ namespace Chess
             HalfMoveClock = posInfo.HalfMoveClock;
             FullMoveClock = posInfo.FullMoveClock;
             zobristKey = Zobrist.GenerateKey(this);
-            repitionHistoy[0] = zobristKey;
+            repetitionHistory[0] = zobristKey;
             historyLength = 1;
         }
         public void MakeMove(Move move, bool inSearch = false)
@@ -318,7 +317,7 @@ namespace Chess
             {
                 HalfMoveClock = 0;
             }
-            repitionHistoy[historyLength++] = zobristKey;
+            repetitionHistory[historyLength++] = zobristKey;
         }
 
 
@@ -482,14 +481,14 @@ namespace Chess
         }
 
 
-        public bool IsThreefoldRepition()
+        public bool IsThreefoldRepetition()
         {
             int start = Math.Max(0, historyLength - HalfMoveClock - 1);
             int count = 0;
 
             for (int i = start; i < historyLength; i++)
             {
-                if (repitionHistoy[i] == zobristKey)
+                if (repetitionHistory[i] == zobristKey)
                 {
                     count++;
                 }
@@ -498,12 +497,12 @@ namespace Chess
             return false;
         }
 
-        public bool IsRepition()
+        public bool IsRepetition()
         {
             int start = Math.Max(0, historyLength - HalfMoveClock - 1);
             for (int i = start; i < historyLength - 1; i++)
             {
-                if (repitionHistoy[i] == zobristKey)
+                if (repetitionHistory[i] == zobristKey)
                     return true;
             }
             return false;

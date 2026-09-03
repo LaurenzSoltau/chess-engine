@@ -1,8 +1,0 @@
-Nodes searched: 264
-b5c4: 42
-c5c4: 43
-d7d5: 43
-f6d5: 45
-f8f7: 45
-g8h8: 46
-info string Available processors: 0-7

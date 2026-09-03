@@ -22,7 +22,6 @@ namespace Chess.Testing
         public TestResults[] testResults;
         public int TestCount;
         public Test[] tests;
-        int currentTest;
         public string fenString;
         public int depth;
         public bool divide;
@@ -34,7 +33,6 @@ namespace Chess.Testing
 
         public Perft()
         {
-            currentTest = 0;
             TestCount = TestUtil.GetTests().Length;
         }
 

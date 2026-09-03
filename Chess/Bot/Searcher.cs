@@ -73,7 +73,7 @@ namespace Chess.Bot
         {
             depthSearched = Math.Max(depthSearched, ply);
 
-            if (board.IsRepition())
+            if (board.IsRepetition())
             {
                 return 0;
             }
@@ -109,7 +109,7 @@ namespace Chess.Bot
         {
             depthSearched = Math.Max(depthSearched, ply);
 
-            if (board.IsRepition())
+            if (board.IsRepetition())
             {
                 return 0;
             }

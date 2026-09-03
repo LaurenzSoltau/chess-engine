@@ -1,3 +1,19 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# .NET build output
+bin/
+obj/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Scratch output from perft / stockfish comparison runs
+stockfishResults/
+Chess/Testing/sorted.txt
+Chess/Testing/sortex.txt
+Chess/Testing/Perft/sorted.txt
+Chess/Testing/Perft/results2.txt
+Chess/Testing/Perft/PerftDivideResults.txt

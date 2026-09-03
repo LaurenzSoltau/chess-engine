@@ -28,7 +28,7 @@ public partial class GameManager : Control
 
     public enum PlayerType { Human, Bot };
 
-    public enum GameState { Playing, WhiteIsMated, BlackIsMated, Stalemate, Repition, FiftyMove, InsufficientMaterial }
+    public enum GameState { Playing, WhiteIsMated, BlackIsMated, Stalemate, Repetition, FiftyMove, InsufficientMaterial }
 
     public GameState gameState;
     PlayerType whitePlayerType;
@@ -229,7 +229,7 @@ public partial class GameManager : Control
         {
             return;
         }
-        ai.StartSearch(6);
+        ai.StartSearch(4);
         Move move = ai.bestMove;
         if (!move.isValid)
         {
@@ -283,9 +283,9 @@ public partial class GameManager : Control
             return;
         }
 
-        if (board.IsThreefoldRepition())
+        if (board.IsThreefoldRepetition())
         {
-            gameState = GameState.Repition;
+            gameState = GameState.Repetition;
             OnGameOver();
             return;
         }
@@ -298,7 +298,7 @@ public partial class GameManager : Control
         GameState.WhiteIsMated => "Schwarz gewinnt durch Schachmatt!",
         GameState.BlackIsMated => "Weiß gewinnt durch Schachmatt!",
         GameState.Stalemate => "Remis durch Patt!",
-        GameState.Repition => "Remis durch dreifache Stellungswiederholung!",
+        GameState.Repetition => "Remis durch dreifache Stellungswiederholung!",
         GameState.FiftyMove => "Remis durch 50-Züge-Regel!",
         GameState.InsufficientMaterial => "Remis durch unzureichendes Material!",
         _ => "Unbekannter Spielzustand.",
