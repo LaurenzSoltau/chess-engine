@@ -86,12 +86,6 @@ Things a stronger engine would have that this one does not (yet):
 - Move generation is not bitboard-based
 - No UCI interface, so the engine cannot be plugged into external chess GUIs
 
-## Credits
-
-<!-- TODO: replace with the actual source and license of the piece sprites in
-     Assets/, or state that they are original work. -->
-Piece sprites: see `Assets/`.
-
 ## License
 
 [MIT](LICENSE)
