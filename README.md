@@ -47,15 +47,19 @@ evaluation myself rather than to compete with established engines.
 ## Running
 
 ```bash
-git clone https://github.com/<your-user>/chess-engine.git
+git clone https://github.com/LaurenzSoltau/chess-engine.git
 cd chess-engine
 dotnet build
 ```
 
-Then open the project folder in the Godot editor and press **F5**, or launch it
-directly from the command line:
+Then open the project folder in the Godot editor and press **F5**. The first
+open also imports the assets, which are not checked in (`.godot/` is ignored).
+
+To run it from the command line instead, do that import once up front,
+otherwise loading the textures fails:
 
 ```bash
+godot --headless --import   # only needed on a fresh clone
 godot --path .
 ```
 
